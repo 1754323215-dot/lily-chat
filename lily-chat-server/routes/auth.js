@@ -78,12 +78,8 @@ router.post('/register', [
 
     await user.save();
 
-    // 生成JWT token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || 'lily-chat-secret-key',
-      { expiresIn: '30d' }
-    );
+    // 返回 token-{userId} 格式（前端期望的格式）
+    const token = `token-${user._id}`;
 
     res.status(201).json({
       message: '注册成功',
@@ -120,12 +116,8 @@ router.post('/login', [
       return res.status(401).json({ message: '用户名或身份证号错误' });
     }
 
-    // 生成JWT token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || 'lily-chat-secret-key',
-      { expiresIn: '30d' }
-    );
+    // 返回 token-{userId} 格式（前端期望的格式）
+    const token = `token-${user._id}`;
 
     res.json({
       message: '登录成功',
