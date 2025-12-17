@@ -1,4 +1,8 @@
-# 移动应用项目
+# Lily Chat - 移动应用项目
+
+## 🔗 GitHub 仓库
+
+**仓库地址**: [https://github.com/1754323215-dot/lily-chat](https://github.com/1754323215-dot/lily-chat)
 
 ## 📱 项目信息
 
@@ -91,11 +95,33 @@ mobile-app/
 └── App.js           # 应用入口
 ```
 
+## 🔄 代码更新流程
+
+### 本地开发 → GitHub → 服务器部署
+
+1. **本地修改代码后提交到 GitHub**：
+   ```bash
+   git add .
+   git commit -m "描述更改内容"
+   git push
+   ```
+
+2. **服务器从 GitHub 拉取并部署**：
+   ```bash
+   # 在服务器上执行
+   bash deploy.sh
+   # 或手动执行
+   git pull origin main
+   ```
+
+详细部署流程请参考：[部署流程.md](部署流程.md)
+
 ## ⚠️ 注意事项
 
 1. **定位权限**: 首次运行会请求定位权限，必须授权
 2. **高德地图 Key**: 确保在高德平台正确配置了包名和 SHA1
 3. **网络连接**: 地图需要网络连接才能加载
+4. **Git 工作流**: 代码更新先推送到 GitHub，再从 GitHub 部署到服务器
 
 ## 🔧 常见问题
 
