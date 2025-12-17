@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lily - 官方网站</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <header class="header">
+        <div class="header-container">
+            <div class="logo">
+                <h1>Lily</h1>
+            </div>
+            <nav class="nav">
+                <ul class="nav-list">
+                    <li><a href="#products" class="nav-link active" data-section="products">产品</a></li>
+                    <li><a href="#recruitment" class="nav-link" data-section="recruitment">直招</a></li>
+                    <li><a href="#chat" class="nav-link" data-section="chat">直聊</a></li>
+                </ul>
+            </nav>
+            <div class="header-right">
+                <div class="language-selector">
+                    <span class="lang active">简</span>
+                    <span class="lang">繁</span>
+                    <span class="lang">EN</span>
+                </div>
+                <button class="search-btn" aria-label="搜索">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容区域 -->
+    <main class="main-content">
+        <!-- Hero Section -->
+        <section class="hero-section" id="hero">
+            <div class="hero-container">
+                <div class="hero-content">
+                    <h2 class="hero-title">欢迎来到Lily</h2>
+                    <p class="hero-subtitle">创新科技，连接未来</p>
+                    <div class="hero-buttons">
+                        <button class="btn btn-primary">了解更多</button>
+                        <button class="btn btn-secondary">立即体验</button>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <div class="hero-visual">
+                        <!-- 这里可以放置图片或动画 -->
+                    </div>
+                </div>
+            </div>
+            <div class="hero-indicators">
+                <span class="indicator active"></span>
+                <span class="indicator"></span>
+                <span class="indicator"></span>
+            </div>
+        </section>
+
+        <!-- 产品页面 -->
+        <section class="content-section" id="products">
+            <div class="section-container">
+                <h2 class="section-title">我们的产品</h2>
+                <div class="products-grid">
+                    <div class="product-card">
+                        <div class="product-icon">💬</div>
+                        <h3 class="product-title">Lily Chat</h3>
+                        <p class="product-description">安全可靠的通讯平台，连接人与人之间的距离</p>
+                        <a href="http://139.129.194.84/8085" class="product-link" target="_blank">了解更多 →</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 直招页面 -->
+        <section class="content-section" id="recruitment">
+            <div class="section-container">
+                <h2 class="section-title">直招信息</h2>
+                <div class="recruitment-content">
+                    <div class="recruitment-intro">
+                        <h3>加入Lily，共创未来</h3>
+                        <p>我们正在寻找有才华、有激情的伙伴加入我们的团队。在这里，你将有机会参与创新项目，与优秀的同事一起成长。</p>
+                    </div>
+                    <div class="jobs-list">
+                        <div class="job-item">
+                            <h4>前端开发工程师</h4>
+                            <p class="job-location">📍 北京 / 远程</p>
+                            <p class="job-desc">负责Web和移动端前端开发，参与产品设计和优化</p>
+                            <button class="btn btn-outline">立即申请</button>
+                        </div>
+                        <div class="job-item">
+                            <h4>后端开发工程师</h4>
+                            <p class="job-location">📍 北京 / 远程</p>
+                            <p class="job-desc">负责后端服务架构设计和开发，确保系统稳定高效</p>
+                            <button class="btn btn-outline">立即申请</button>
+                        </div>
+                        <div class="job-item">
+                            <h4>产品经理</h4>
+                            <p class="job-location">📍 北京</p>
+                            <p class="job-desc">负责产品规划和需求分析，推动产品迭代和优化</p>
+                            <button class="btn btn-outline">立即申请</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 直聊页面 -->
+        <section class="content-section" id="chat">
+            <div class="section-container">
+                <h2 class="section-title">直聊服务</h2>
+                <div class="chat-content">
+                    <div class="chat-intro">
+                        <h3>直接沟通，快速响应</h3>
+                        <p>通过我们的直聊服务，您可以与我们的团队直接沟通，获得快速、专业的支持。</p>
+                    </div>
+                    <div class="chat-features">
+                        <div class="feature-item">
+                            <div class="feature-icon">⚡</div>
+                            <h4>快速响应</h4>
+                            <p>7x24小时在线支持，平均响应时间小于5分钟</p>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon">👥</div>
+                            <h4>专业团队</h4>
+                            <p>经验丰富的技术支持团队，为您提供专业解答</p>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon">🔒</div>
+                            <h4>安全可靠</h4>
+                            <p>端到端加密，保护您的隐私和数据安全</p>
+                        </div>
+                    </div>
+                    <div class="chat-action">
+                        <button class="btn btn-primary btn-large">开始对话</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 最新动态 -->
+        <section class="content-section" id="news">
+            <div class="section-container">
+                <h2 class="section-title">最新动态</h2>
+                <div class="news-grid">
+                    <div class="news-card">
+                        <div class="news-image"></div>
+                        <div class="news-content">
+                            <span class="news-date">2024年12月</span>
+                            <h3 class="news-title">Lily产品全新升级</h3>
+                            <p class="news-excerpt">我们很高兴地宣布Lily产品的最新版本，带来了更多创新功能和更好的用户体验。</p>
+                        </div>
+                    </div>
+                    <div class="news-card">
+                        <div class="news-image"></div>
+                        <div class="news-content">
+                            <span class="news-date">2024年11月</span>
+                            <h3 class="news-title">团队扩展计划</h3>
+                            <p class="news-excerpt">Lily正在扩大团队规模，欢迎有才华的开发者加入我们，共同打造优秀的产品。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>关于Lily</h4>
+                    <ul>
+                        <li><a href="#">公司简介</a></li>
+                        <li><a href="#">联系我们</a></li>
+                        <li><a href="#">加入我们</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>产品与服务</h4>
+                    <ul>
+                        <li><a href="#products">产品</a></li>
+                        <li><a href="#chat">直聊</a></li>
+                        <li><a href="#">技术支持</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>法律信息</h4>
+                    <ul>
+                        <li><a href="#">隐私政策</a></li>
+                        <li><a href="#">服务条款</a></li>
+                        <li><a href="#">版权声明</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Lily. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
+
