@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const mongoose = require('mongoose');
 const Question = require('../models/Question');
 const User = require('../models/User');
 const Message = require('../models/Message');
@@ -25,6 +26,11 @@ router.post('/', authenticate, [
     }
 
     const { answererId, content, price } = req.body;
+
+    // 验证 answererId 是否为有效的 ObjectId
+    if (!mongoose.Types.ObjectId.isValid(answererId)) {
+      return res.status(400).json({ message: '无效的用户ID格式' });
+    }
 
     // 检查被提问者是否存在
     const answerer = await User.findById(answererId);

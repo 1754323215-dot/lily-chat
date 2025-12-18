@@ -1,7 +1,9 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const mongoose = require('mongoose');
 const Message = require('../models/Message');
 const Question = require('../models/Question');
+const User = require('../models/User');
 const { authenticate } = require('./auth');
 const router = express.Router();
 
@@ -158,6 +160,17 @@ router.post('/', authenticate, [
 
     const { receiverId, content } = req.body;
 
+    // 验证 receiverId 是否为有效的 ObjectId
+    if (!mongoose.Types.ObjectId.isValid(receiverId)) {
+      return res.status(400).json({ message: '无效的用户ID格式' });
+    }
+
+    // 检查接收者是否存在
+    const receiver = await User.findById(receiverId);
+    if (!receiver) {
+      return res.status(404).json({ message: '接收者不存在' });
+    }
+
     const conversationId = generateConversationId(req.user._id, receiverId);
 
     const message = new Message({
@@ -188,7 +201,20 @@ router.post('/', authenticate, [
 // 获取与特定用户的会话
 router.get('/user/:userId', authenticate, async (req, res) => {
   try {
-    const conversationId = generateConversationId(req.user._id, req.params.userId);
+    const { userId } = req.params;
+    
+    // 验证 userId 是否为有效的 ObjectId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: '无效的用户ID格式' });
+    }
+
+    // 检查用户是否存在
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: '用户不存在' });
+    }
+
+    const conversationId = generateConversationId(req.user._id, userId);
 
     const messages = await Message.find({ conversationId })
       .populate('senderId', 'username avatar')

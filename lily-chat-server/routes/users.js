@@ -93,13 +93,13 @@ router.post('/nearby', authenticate, [
         }).select('name type level verified');
         
         return {
-          id: user._id,
+          id: user._id.toString(),
           name: user.username,
           avatar: user.avatar,
           lat: user.location.latitude,
           lng: user.location.longitude,
           tags: tags.map(tag => ({
-            id: tag._id,
+            id: tag._id.toString(),
             name: tag.name,
             type: tag.type,
             level: tag.level,
@@ -133,14 +133,14 @@ router.get('/:userId', authenticate, async (req, res) => {
 
     res.json({
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.username,
         avatar: user.avatar,
         realName: user.realName,
         balance: user.balance,
         stats: user.stats,
         tags: tags.map(tag => ({
-          id: tag._id,
+          id: tag._id.toString(),
           name: tag.name,
           type: tag.type,
           level: tag.level,

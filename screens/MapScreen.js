@@ -97,6 +97,7 @@ export default function MapScreen({ navigation }) {
   const [showUserCard, setShowUserCard] = useState(false);
   const [clusterUsers, setClusterUsers] = useState([]);
   const [showClusterList, setShowClusterList] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const webViewRef = useRef(null);
 
   // 模拟用户数据（包含标签信息）
@@ -160,8 +161,21 @@ export default function MapScreen({ navigation }) {
   ];
 
   useEffect(() => {
+    loadCurrentUser();
     getCurrentLocation();
   }, []);
+
+  const loadCurrentUser = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        setCurrentUser(user);
+      }
+    } catch (error) {
+      console.error('加载当前用户信息失败:', error);
+    }
+  };
 
   const getCurrentLocation = async () => {
     setLoading(true);
@@ -415,6 +429,16 @@ export default function MapScreen({ navigation }) {
               background-position: center;
               background-color: #eee;
             }
+            .current-user-marker {
+              width: 44px;
+              height: 44px;
+              border-radius: 50%;
+              border: 3px solid #007AFF;
+              box-shadow: 0 2px 8px rgba(0, 122, 255, 0.5);
+              background-size: cover;
+              background-position: center;
+              background-color: #eee;
+            }
             .cluster-marker {
               width: 44px;
               height: 44px;
@@ -535,6 +559,15 @@ export default function MapScreen({ navigation }) {
                   var users = ${JSON.stringify(finalUsers)};
                   console.log('用户数据:', users);
                   
+                  // 当前用户信息
+                  var currentUser = ${currentUser ? JSON.stringify({
+                    id: currentUser.id,
+                    name: currentUser.username || currentUser.name || '我',
+                    avatar: currentUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=me',
+                    lat: ${location.latitude},
+                    lng: ${location.longitude}
+                  }) : 'null'};
+                  
                   // 转换数据为点标记
                   var markers = users.map(function(user) {
                     // 创建自定义内容
@@ -561,6 +594,24 @@ export default function MapScreen({ navigation }) {
 
                     return marker;
                   });
+                  
+                  // 添加当前用户的位置标记
+                  if (currentUser) {
+                    var currentUserContent = document.createElement('div');
+                    currentUserContent.className = 'current-user-marker';
+                    currentUserContent.style.backgroundImage = 'url(' + currentUser.avatar + ')';
+                    
+                    var currentUserMarker = new AMap.Marker({
+                      position: [currentUser.lng, currentUser.lat],
+                      content: currentUserContent,
+                      offset: new AMap.Pixel(-22, -44),
+                      zIndex: 1000, // 确保当前用户标记在最上层
+                      map: map
+                    });
+                    
+                    markers.push(currentUserMarker);
+                    console.log('已添加当前用户位置标记');
+                  }
 
                   // 创建聚合（使用 MarkerClusterer，注意插件名称）
                   var cluster = new AMap.MarkerClusterer(map, markers, {
@@ -779,7 +830,7 @@ export default function MapScreen({ navigation }) {
           setSelectedUser(null);
         }}
         onChat={handleChat}
-        currentUserId={null}
+        currentUserId={currentUser?.id}
       />
 
       {/* 聚合用户列表 */}
