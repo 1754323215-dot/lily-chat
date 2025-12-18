@@ -295,15 +295,25 @@ export default function ChatDetailScreen({ route, navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id.toString()}
-        style={styles.messagesList}
-        contentContainerStyle={styles.messagesContent}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-      />
+      {messages.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={[styles.emptyEmoji, { color: theme.colors.secondaryText }]}>💬</Text>
+          <Text style={[styles.emptyText, { color: theme.colors.text }]}>还没有消息</Text>
+          <Text style={[styles.emptySubtext, { color: theme.colors.secondaryText }]}>
+            开始和 {userName || '对方'} 聊天吧
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id.toString()}
+          style={styles.messagesList}
+          contentContainerStyle={styles.messagesContent}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        />
+      )}
 
       <View
         style={[
@@ -359,11 +369,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messagesContent: {
-    padding: 15,
+    paddingVertical: 15,
+    paddingHorizontal: 0,
   },
   messageContainer: {
-    marginBottom: 15,
+    marginBottom: 12,
     flexDirection: 'row',
+    paddingHorizontal: 15,
   },
   messageLeft: {
     justifyContent: 'flex-start',
@@ -373,16 +385,24 @@ const styles = StyleSheet.create({
   },
   messageBubble: {
     maxWidth: '75%',
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   messageText: {
     fontSize: 16,
+    lineHeight: 22,
     marginBottom: 4,
   },
   messageTime: {
     fontSize: 11,
     alignSelf: 'flex-end',
+    marginTop: 2,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -412,6 +432,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyEmoji: {
+    fontSize: 64,
+    marginBottom: 20,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
 

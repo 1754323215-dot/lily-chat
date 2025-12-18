@@ -375,9 +375,16 @@ export default function MapScreen({ navigation }) {
 
   // 处理私聊
   const handleChat = (user) => {
-    // 导航到聊天页面，并传递用户信息
+    // 直接导航到聊天详情页面
     if (navigation) {
-      navigation.navigate('Chat', { targetUser: user });
+      navigation.navigate('Chat', {
+        screen: 'ChatDetail',
+        params: {
+          userId: user.id,
+          userName: user.name,
+          avatar: user.avatar,
+        },
+      });
     }
   };
 
