@@ -317,9 +317,27 @@ export default function MapScreen({ navigation }) {
     try {
       const url = `${API_BASE_URL}/users/nearby`;
       console.log('请求附近用户 URL:', url, '坐标:', lat, lng);
+
+      // 尝试携带登录 Token（后端需要认证才能返回真实附近用户）
+      let headers = { 'Content-Type': 'application/json' };
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (token) {
+          const actualToken = formatToken(token);
+          if (actualToken) {
+            headers = {
+              ...headers,
+              Authorization: `Bearer ${actualToken}`,
+            };
+          }
+        }
+      } catch (tokenError) {
+        console.warn('读取 Token 失败（将继续使用本地模拟用户）:', tokenError);
+      }
+
       const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ latitude: lat, longitude: lng }),
       });
       const data = await resp.json();
@@ -579,8 +597,8 @@ export default function MapScreen({ navigation }) {
                     id: currentUser.id,
                     name: currentUser.username || currentUser.name || '我',
                     avatar: currentUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=me',
-                    lat: ${location.latitude},
-                    lng: ${location.longitude}
+                    lat: location.latitude,
+                    lng: location.longitude
                   }) : 'null'};
                   
                   // 转换数据为点标记

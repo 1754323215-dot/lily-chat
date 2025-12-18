@@ -31,10 +31,10 @@ export default function AuthScreen({ onLoginSuccess }) {
     }
   };
 
-  // 登录：用户名 + 身份证号
+  // 登录：真实姓名 + 身份证号
   const handleLogin = async () => {
-    if (!formData.username) {
-      Alert.alert('错误', '请输入用户名');
+    if (!formData.realName) {
+      Alert.alert('错误', '请输入真实姓名');
       return;
     }
     if (!formData.idCard) {
@@ -50,7 +50,7 @@ export default function AuthScreen({ onLoginSuccess }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: formData.username,
+          realName: formData.realName,
           idCard: formData.idCard,
         }),
       });
@@ -139,28 +139,13 @@ export default function AuthScreen({ onLoginSuccess }) {
       <View style={styles.header}>
         <Text style={[styles.logo, { color: theme.colors.primary }]}>Lily Chat</Text>
         <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
-          {isLogin ? '登录' : '注册'}（仅需用户名、真实姓名和身份证号）
+          {isLogin ? '登录' : '注册'}（登录仅需真实姓名和身份证号，注册需要额外设置用户名）
         </Text>
       </View>
 
       <View style={styles.form}>
-        <View style={styles.inputGroup}>
-          <Text style={[styles.label, { color: theme.colors.text }]}>用户名（不限字数）*</Text>
-          <TextInput
-            style={[styles.input, { 
-              backgroundColor: theme.colors.inputBackground,
-              borderColor: theme.colors.border,
-              color: theme.colors.text
-            }]}
-            placeholder="请输入用户名"
-            placeholderTextColor={theme.colors.placeholder}
-            value={formData.username}
-            onChangeText={(text) => setFormData({ ...formData, username: text })}
-            autoCapitalize="none"
-          />
-        </View>
-
-        {!isLogin && (
+        {/* 登录模式：真实姓名 + 身份证号 */}
+        {isLogin && (
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: theme.colors.text }]}>真实姓名 *</Text>
             <TextInput
@@ -175,6 +160,42 @@ export default function AuthScreen({ onLoginSuccess }) {
               onChangeText={(text) => setFormData({ ...formData, realName: text })}
             />
           </View>
+        )}
+
+        {/* 注册模式：用户名 + 真实姓名 */}
+        {!isLogin && (
+          <>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>用户名（不限字数）*</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme.colors.inputBackground,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text
+                }]}
+                placeholder="请输入用户名"
+                placeholderTextColor={theme.colors.placeholder}
+                value={formData.username}
+                onChangeText={(text) => setFormData({ ...formData, username: text })}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>真实姓名 *</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme.colors.inputBackground,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text
+                }]}
+                placeholder="请输入真实姓名"
+                placeholderTextColor={theme.colors.placeholder}
+                value={formData.realName}
+                onChangeText={(text) => setFormData({ ...formData, realName: text })}
+              />
+            </View>
+          </>
         )}
 
         <View style={styles.inputGroup}>

@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const router = express.Router();
@@ -18,7 +19,23 @@ const authenticate = async (req, res, next) => {
     // 1. token-{userId} 格式（前端发送的格式）
     if (token.startsWith('token-')) {
       const userId = token.replace('token-', '');
+      console.log('🔍 认证调试 - Token格式: token-{userId}, 提取的userId:', userId);
+      
+      // 验证 userId 是否为有效的 ObjectId
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        console.error('❌ 认证失败 - 无效的 ObjectId 格式:', userId);
+        return res.status(401).json({ message: 'Token格式无效' });
+      }
+      
       user = await User.findById(userId);
+      if (!user) {
+        console.error('❌ 认证失败 - 用户不存在, userId:', userId);
+        // 尝试查找所有用户，看看是否有其他用户
+        const userCount = await User.countDocuments();
+        console.log('📊 数据库中用户总数:', userCount);
+        return res.status(401).json({ message: '用户不存在' });
+      }
+      console.log('✅ 认证成功 - 找到用户:', user.username, 'ID:', user._id);
     } 
     // 2. JWT 格式（标准格式）
     else {
@@ -27,7 +44,9 @@ const authenticate = async (req, res, next) => {
         user = await User.findById(decoded.userId);
       } catch (jwtError) {
         // JWT 验证失败，尝试作为 userId 直接查找（兼容旧格式）
-        user = await User.findById(token);
+        if (mongoose.Types.ObjectId.isValid(token)) {
+          user = await User.findById(token);
+        }
       }
     }
 
@@ -38,7 +57,8 @@ const authenticate = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    console.error('认证错误:', error);
+    console.error('❌ 认证错误:', error);
+    console.error('错误堆栈:', error.stack);
     res.status(401).json({ message: 'Token无效' });
   }
 };
@@ -98,9 +118,9 @@ router.post('/register', [
   }
 });
 
-// 登录（用户名 + 身份证号）
+// 登录（真实姓名 + 身份证号）
 router.post('/login', [
-  body('username').trim().notEmpty().withMessage('用户名不能为空'),
+  body('realName').trim().notEmpty().withMessage('真实姓名不能为空'),
   body('idCard').trim().notEmpty().withMessage('身份证号不能为空')
 ], async (req, res) => {
   try {
@@ -109,11 +129,12 @@ router.post('/login', [
       return res.status(400).json({ message: errors.array()[0].msg });
     }
 
-    const { username, idCard } = req.body;
+    const { realName, idCard } = req.body;
 
-    const user = await User.findOne({ username, idCard });
+    // 使用真实姓名 + 身份证号登录
+    const user = await User.findOne({ realName, idCard });
     if (!user) {
-      return res.status(401).json({ message: '用户名或身份证号错误' });
+      return res.status(401).json({ message: '真实姓名或身份证号错误' });
     }
 
     // 返回 token-{userId} 格式（前端期望的格式）
@@ -123,7 +144,7 @@ router.post('/login', [
       message: '登录成功',
       token,
       user: {
-        id: user._id,
+        id: user._id.toString(),
         username: user.username,
         realName: user.realName,
         avatar: user.avatar,
