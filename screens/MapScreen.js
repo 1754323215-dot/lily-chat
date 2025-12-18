@@ -377,6 +377,8 @@ export default function MapScreen({ navigation }) {
   const handleChat = (user) => {
     // 直接导航到聊天详情页面
     if (navigation) {
+      console.log('导航到聊天详情:', user);
+      // 先切换到 Chat Tab，然后导航到 ChatDetail
       navigation.navigate('Chat', {
         screen: 'ChatDetail',
         params: {

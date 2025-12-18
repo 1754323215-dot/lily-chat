@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, formatToken } from '../constants/config';
+import { useTheme } from '../contexts/ThemeContext';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function ChatScreen({ route, navigation }) {
@@ -19,6 +21,22 @@ export default function ChatScreen({ route, navigation }) {
   useEffect(() => {
     fetchContacts();
   }, []);
+
+  // 如果导航参数中包含直接跳转到 ChatDetail 的请求，自动跳转
+  useFocusEffect(
+    React.useCallback(() => {
+      // 检查是否有需要跳转到 ChatDetail 的参数
+      const chatDetailParams = route?.params?.screen === 'ChatDetail' ? route?.params?.params : null;
+      if (chatDetailParams) {
+        console.log('检测到需要跳转到 ChatDetail，参数:', chatDetailParams);
+        // 延迟一下，确保导航栈已经准备好
+        const timer = setTimeout(() => {
+          navigation.navigate('ChatDetail', chatDetailParams);
+        }, 200);
+        return () => clearTimeout(timer);
+      }
+    }, [route?.params, navigation])
+  );
 
   // 如果从地图页面传入目标用户，创建新对话（仅插入列表，点击可进入后续私聊页面，当前保持简单列表）
   useEffect(() => {
