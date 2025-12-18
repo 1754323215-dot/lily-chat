@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
+import { CommonActions } from '@react-navigation/native';
 import { AMAP_KEY, API_BASE_URL, formatToken } from '../constants/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import UserCard from '../components/UserCard';
@@ -378,15 +379,20 @@ export default function MapScreen({ navigation }) {
     // 直接导航到聊天详情页面
     if (navigation) {
       console.log('导航到聊天详情:', user);
-      // 先切换到 Chat Tab，然后导航到 ChatDetail
-      navigation.navigate('Chat', {
-        screen: 'ChatDetail',
-        params: {
-          userId: user.id,
-          userName: user.name,
-          avatar: user.avatar,
-        },
-      });
+      // 使用 CommonActions 确保导航正确执行
+      navigation.dispatch(
+        CommonActions.navigate({
+          name: 'Chat',
+          params: {
+            screen: 'ChatDetail',
+            params: {
+              userId: user.id,
+              userName: user.name,
+              avatar: user.avatar,
+            },
+          },
+        })
+      );
     }
   };
 
