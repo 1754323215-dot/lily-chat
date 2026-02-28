@@ -5,6 +5,9 @@ const Question = require('../models/Question');
 const User = require('../models/User');
 const Message = require('../models/Message');
 const { authenticate } = require('./auth');
+const { questionLimiter } = require('../middleware/rateLimiter');
+const { sanitize } = require('../utils/xssFilter');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 // 生成会话ID
@@ -14,10 +17,10 @@ function generateConversationId(userId1, userId2) {
 }
 
 // 创建付费提问
-router.post('/', authenticate, [
+router.post('/', authenticate, questionLimiter, [
   body('answererId').notEmpty().withMessage('被提问者ID不能为空'),
-  body('content').trim().notEmpty().withMessage('问题内容不能为空'),
-  body('price').isFloat({ min: 0.01 }).withMessage('提问价格必须大于0')
+  body('content').trim().notEmpty().withMessage('问题内容不能为空').isLength({ max: 2000 }).withMessage('问题内容不能超过2000个字符'),
+  body('price').isFloat({ min: 0.01, max: 10000 }).withMessage('提问价格必须在0.01-10000元之间')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -25,7 +28,9 @@ router.post('/', authenticate, [
       return res.status(400).json({ message: errors.array()[0].msg });
     }
 
-    const { answererId, content, price } = req.body;
+    const { answererId, price } = req.body;
+    // XSS 过滤问题内容
+    const content = sanitize(req.body.content.trim());
 
     // 验证 answererId 是否为有效的 ObjectId
     if (!mongoose.Types.ObjectId.isValid(answererId)) {
@@ -38,14 +43,7 @@ router.post('/', authenticate, [
       return res.status(404).json({ message: '被提问者不存在' });
     }
 
-    // 检查余额
-    if (req.user.balance < price) {
-      return res.status(400).json({ message: '余额不足' });
-    }
-
-    // 扣除提问者余额
-    req.user.balance -= price;
-    await req.user.save();
+    // 不再检查余额和扣除，改为用户自行支付
 
     // 生成会话ID
     const conversationId = generateConversationId(req.user._id, answererId);
@@ -67,12 +65,19 @@ router.post('/', authenticate, [
       conversationId,
       senderId: req.user._id,
       receiverId: answererId,
-      content: `付费提问：${content}`,
+      content: `付费提问：${content}`, // content 已经过 XSS 过滤
       type: 'question',
       questionId: question._id
     });
 
     await message.save();
+
+    logger.info('付费提问已创建', { 
+      askerId: req.user._id, 
+      answererId, 
+      price, 
+      questionId: question._id 
+    });
 
     res.status(201).json({
       message: '提问已发送',
@@ -80,7 +85,7 @@ router.post('/', authenticate, [
       conversationId
     });
   } catch (error) {
-    console.error('创建提问错误:', error);
+    logger.error('创建提问错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -117,13 +122,15 @@ router.post('/:questionId/accept', authenticate, async (req, res) => {
 
     await message.save();
 
+    logger.info('提问已接受', { questionId: question._id, answererId: req.user._id });
+
     res.json({
       message: '已接受提问',
       question,
       conversationId: question.conversationId
     });
   } catch (error) {
-    console.error('接受提问错误:', error);
+    logger.error('接受提问错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -145,11 +152,7 @@ router.post('/:questionId/reject', authenticate, async (req, res) => {
       return res.status(400).json({ message: '提问状态不正确' });
     }
 
-    // 退款给提问者
-    const asker = await User.findById(question.askerId);
-    asker.balance += question.price;
-    await asker.save();
-
+    // 不再退款，因为用户自行支付
     question.status = 'rejected';
     question.rejectedAt = new Date();
     await question.save();
@@ -159,25 +162,72 @@ router.post('/:questionId/reject', authenticate, async (req, res) => {
       conversationId: question.conversationId,
       senderId: req.user._id,
       receiverId: question.askerId,
-      content: '已拒绝您的付费提问，费用已退回',
+      content: '已拒绝您的付费提问',
       type: 'text'
     });
 
     await message.save();
 
+    logger.info('提问已拒绝', { questionId: question._id, answererId: req.user._id });
+
     res.json({
-      message: '已拒绝提问，费用已退回',
+      message: '已拒绝提问',
       question
     });
   } catch (error) {
-    console.error('拒绝提问错误:', error);
+    logger.error('拒绝提问错误:', error);
+    res.status(500).json({ message: '服务器错误' });
+  }
+});
+
+// 确认支付（提问者确认已支付）
+router.post('/:questionId/confirm-payment', authenticate, async (req, res) => {
+  try {
+    const question = await Question.findById(req.params.questionId);
+
+    if (!question) {
+      return res.status(404).json({ message: '提问不存在' });
+    }
+
+    if (question.askerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: '只有提问者可以确认支付' });
+    }
+
+    if (question.paid) {
+      return res.status(400).json({ message: '该提问已确认支付' });
+    }
+
+    question.paid = true;
+    question.paidBy = req.user._id;
+    question.paidAt = new Date();
+    await question.save();
+
+    // 创建支付确认消息
+    const message = new Message({
+      conversationId: question.conversationId,
+      senderId: req.user._id,
+      receiverId: question.answererId,
+      content: `已确认支付 ¥${question.price}，请尽快回答`,
+      type: 'text'
+    });
+
+    await message.save();
+
+    logger.info('支付已确认', { questionId: question._id, askerId: req.user._id });
+
+    res.json({
+      message: '支付确认成功',
+      question
+    });
+  } catch (error) {
+    logger.error('确认支付错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
 
 // 回答提问
 router.post('/:questionId/answer', authenticate, [
-  body('answer').trim().notEmpty().withMessage('回答内容不能为空')
+  body('answer').trim().notEmpty().withMessage('回答内容不能为空').isLength({ max: 5000 }).withMessage('回答内容不能超过5000个字符')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -199,11 +249,22 @@ router.post('/:questionId/answer', authenticate, [
       return res.status(400).json({ message: '提问状态不正确' });
     }
 
+    // 检查是否已支付（可选，如果未支付也可以回答）
+    // if (!question.paid) {
+    //   return res.status(400).json({ message: '提问者尚未确认支付' });
+    // }
+
+    // XSS 过滤回答内容
+    const answerContent = sanitize(req.body.answer.trim());
+    
     question.answer = {
-      content: req.body.answer,
+      content: answerContent,
       answeredAt: new Date()
     };
+    question.status = 'completed';
     await question.save();
+
+    logger.info('提问已回答', { questionId: question._id, answererId: req.user._id });
 
     // 创建回答消息
     const message = new Message({
@@ -221,7 +282,7 @@ router.post('/:questionId/answer', authenticate, [
       question
     });
   } catch (error) {
-    console.error('回答提问错误:', error);
+    logger.error('回答提问错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -247,7 +308,7 @@ router.get('/:questionId', authenticate, async (req, res) => {
 
     res.json(question);
   } catch (error) {
-    console.error('获取提问详情错误:', error);
+    logger.error('获取提问详情错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -270,7 +331,7 @@ router.get('/conversation/:userId', authenticate, async (req, res) => {
 
     res.json({ questions });
   } catch (error) {
-    console.error('获取会话提问列表错误:', error);
+    logger.error('获取会话提问列表错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -284,7 +345,7 @@ router.get('/my-asked', authenticate, async (req, res) => {
 
     res.json({ questions });
   } catch (error) {
-    console.error('获取提问列表错误:', error);
+    logger.error('获取提问列表错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -298,7 +359,7 @@ router.get('/my-received', authenticate, async (req, res) => {
 
     res.json({ questions });
   } catch (error) {
-    console.error('获取收到的提问列表错误:', error);
+    logger.error('获取收到的提问列表错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -334,12 +395,14 @@ router.post('/:questionId/dispute', authenticate, [
     };
     await question.save();
 
+    logger.info('提问申诉已提交', { questionId: question._id, askerId: req.user._id });
+
     res.json({
       message: '申诉已提交，等待客服处理',
       question
     });
   } catch (error) {
-    console.error('申诉错误:', error);
+    logger.error('申诉错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });

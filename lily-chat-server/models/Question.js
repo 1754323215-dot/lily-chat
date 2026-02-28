@@ -34,8 +34,16 @@ const questionSchema = new mongoose.Schema({
     content: String,
     answeredAt: Date
   },
-  // 支付信息
+  // 支付信息（用户自行支付）
   paidAt: Date,
+  paid: {
+    type: Boolean,
+    default: false
+  },
+  paidBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User' // 标记为已支付的用户（提问者）
+  },
   // 申诉信息
   dispute: {
     reason: String,

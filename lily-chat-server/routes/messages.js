@@ -5,6 +5,9 @@ const Message = require('../models/Message');
 const Question = require('../models/Question');
 const User = require('../models/User');
 const { authenticate } = require('./auth');
+const { messageLimiter } = require('../middleware/rateLimiter');
+const { sanitize } = require('../utils/xssFilter');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 // 生成会话ID
@@ -13,9 +16,10 @@ function generateConversationId(userId1, userId2) {
   return `conv_${ids[0]}_${ids[1]}`;
 }
 
-// 获取联系人列表（用于聊天页面）
-router.get('/contacts', authenticate, async (req, res) => {
+// 获取联系人列表（用于聊天页面）；可复用于 /api/messages/contacts 与 /api/v1/contacts
+async function getContacts(req, res) {
   try {
+    logger.info('getContacts 被调用', { userId: req.user?._id?.toString() });
     // 获取所有包含当前用户的会话
     const messages = await Message.find({
       $or: [
@@ -31,26 +35,36 @@ router.get('/contacts', authenticate, async (req, res) => {
     const contactUserIds = new Set();
     const contactMap = new Map();
 
-    messages.forEach(msg => {
-      const otherUserId = msg.senderId._id.toString() === req.user._id.toString() 
-        ? msg.receiverId._id 
-        : msg.senderId._id;
-      
-      const otherUser = msg.senderId._id.toString() === req.user._id.toString() 
-        ? msg.receiverId 
-        : msg.senderId;
+    const myIdStr = (req.user._id && req.user._id.toString) ? req.user._id.toString() : '';
+    if (!myIdStr) {
+      return res.status(401).json({ message: '未授权，请先登录' });
+    }
 
-      if (!contactMap.has(otherUserId.toString())) {
-        contactMap.set(otherUserId.toString(), {
-          id: otherUserId,
-          username: otherUser.username,
-          avatar: otherUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`,
+    messages.forEach((msg) => {
+      const senderId = msg.senderId && msg.senderId._id ? msg.senderId._id.toString() : '';
+      const receiverId = msg.receiverId && msg.receiverId._id ? msg.receiverId._id.toString() : '';
+      if (!senderId || !receiverId) return;
+
+      const isSenderSelf = senderId === myIdStr;
+      const otherUserId = isSenderSelf ? receiverId : senderId;
+      const otherUser = isSenderSelf ? msg.receiverId : msg.senderId;
+      if (!otherUser) return;
+
+      const key = otherUserId;
+
+      if (!contactMap.has(key)) {
+        const name = otherUser.username || '用户';
+        contactMap.set(key, {
+          id: key,
+          username: name,
+          avatar: otherUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
           lastMessage: msg.content,
-          lastTime: msg.createdAt
+          lastTime: msg.createdAt,
+          unreadCount: 0,
         });
       } else {
         // 更新最后一条消息（如果这条消息更新）
-        const existing = contactMap.get(otherUserId.toString());
+        const existing = contactMap.get(key);
         if (new Date(msg.createdAt) > new Date(existing.lastTime)) {
           existing.lastMessage = msg.content;
           existing.lastTime = msg.createdAt;
@@ -58,14 +72,33 @@ router.get('/contacts', authenticate, async (req, res) => {
       }
     });
 
+    // 统计每个联系人发给我且未读的消息数
+    try {
+      const myId = mongoose.Types.ObjectId(myIdStr);
+      const unreadBySender = await Message.aggregate([
+        { $match: { receiverId: myId, read: false } },
+        { $group: { _id: '$senderId', count: { $sum: 1 } } }
+      ]);
+      unreadBySender.forEach(({ _id, count }) => {
+        if (!_id) return;
+        const key = typeof _id.toString === 'function' ? _id.toString() : String(_id);
+        if (contactMap.has(key)) contactMap.get(key).unreadCount = count;
+      });
+    } catch (aggErr) {
+      logger.warn('getContacts 未读统计失败', { message: aggErr.message });
+    }
+
     const contacts = Array.from(contactMap.values());
-    
+    logger.info('getContacts 返回', { count: contacts.length });
+
     res.json(contacts);
   } catch (error) {
-    console.error('获取联系人列表错误:', error);
+    logger.error('获取联系人列表错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
-});
+}
+
+router.get('/contacts', authenticate, getContacts);
 
 // 获取会话列表
 router.get('/conversations', authenticate, async (req, res) => {
@@ -109,7 +142,7 @@ router.get('/conversations', authenticate, async (req, res) => {
 
     res.json({ conversations });
   } catch (error) {
-    console.error('获取会话列表错误:', error);
+    logger.error('获取会话列表错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -142,15 +175,15 @@ router.get('/conversation/:conversationId', authenticate, async (req, res) => {
 
     res.json({ messages: messages.reverse() });
   } catch (error) {
-    console.error('获取消息错误:', error);
+    logger.error('获取消息错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
 
 // 发送消息
-router.post('/', authenticate, [
+router.post('/', authenticate, messageLimiter, [
   body('receiverId').notEmpty().withMessage('接收者ID不能为空'),
-  body('content').trim().notEmpty().withMessage('消息内容不能为空')
+  body('content').trim().notEmpty().withMessage('消息内容不能为空').isLength({ max: 5000 }).withMessage('消息内容不能超过5000个字符')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -158,7 +191,9 @@ router.post('/', authenticate, [
       return res.status(400).json({ message: errors.array()[0].msg });
     }
 
-    const { receiverId, content } = req.body;
+    const { receiverId } = req.body;
+    // XSS 过滤消息内容
+    const content = sanitize(req.body.content.trim());
 
     // 验证 receiverId 是否为有效的 ObjectId
     if (!mongoose.Types.ObjectId.isValid(receiverId)) {
@@ -187,13 +222,19 @@ router.post('/', authenticate, [
       .populate('senderId', 'username avatar')
       .populate('receiverId', 'username avatar');
 
+    logger.info('消息发送成功', { 
+      senderId: req.user._id, 
+      receiverId, 
+      conversationId 
+    });
+
     res.status(201).json({
       message: '消息发送成功',
       data: populatedMessage,
       conversationId
     });
   } catch (error) {
-    console.error('发送消息错误:', error);
+    logger.error('发送消息错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -216,6 +257,12 @@ router.get('/user/:userId', authenticate, async (req, res) => {
 
     const conversationId = generateConversationId(req.user._id, userId);
 
+    // 打开会话时标记该会话中“发给我”的未读消息为已读
+    await Message.updateMany(
+      { conversationId, receiverId: req.user._id, read: false },
+      { read: true, readAt: new Date() }
+    );
+
     const messages = await Message.find({ conversationId })
       .populate('senderId', 'username avatar')
       .populate('receiverId', 'username avatar')
@@ -233,11 +280,12 @@ router.get('/user/:userId', authenticate, async (req, res) => {
       pendingQuestion
     });
   } catch (error) {
-    console.error('获取用户会话错误:', error);
+    logger.error('获取用户会话错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
 
+router.getContacts = getContacts;
 module.exports = router;
 
 

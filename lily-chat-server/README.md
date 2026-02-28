@@ -82,6 +82,8 @@ npm start
 
 ### 消息相关
 
+- `GET /api/messages/contacts` - 获取联系人列表（含未读数）
+- `GET /api/v1/contacts` - 同上（兼容别名，避免 404）
 - `GET /api/messages/conversations` - 获取会话列表
 - `GET /api/messages/conversation/:conversationId` - 获取会话消息
 - `POST /api/messages` - 发送消息
@@ -102,3 +104,13 @@ npm start
 服务器端口：8083（与campus trading的8081端口分离）
 
 数据库：lily-chat（独立的MongoDB数据库）
+
+### 一次性清理测试用户（可选）
+
+若「附近的人」等仍出现 test_teacher 等测试账号，说明数据库中仍有对应用户，可做一次性清理：
+
+- 在项目根目录有脚本 `cleanup-lily-test.js`（mongosh 用）。在服务器上切到 lily-chat 库后执行：  
+  `mongosh lily-chat < ../cleanup-lily-test.js`  
+  或使用正则手动删除：  
+  `db.users.deleteMany({ username: /test|teacher/i });`
+- 清理后需重启后端（如 PM2 restart），并确保已部署当前仓库中已去掉 isTestUser 的 `routes/users.js`。
