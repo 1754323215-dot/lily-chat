@@ -107,6 +107,7 @@ function ChatDetail() {
                 return {
                   id: m._id,
                   content: m.content,
+                  type: m.type || 'text',
                   isMe: sid === myId,
                   createdAt: m.createdAt,
                 };
@@ -259,7 +260,7 @@ function ChatDetail() {
             className={'chat-tab' + (activeTab === 'chat' ? ' chat-tab-active' : '')}
             onClick={() => setActiveTab('chat')}
           >
-            普通对话
+            聊天记录
           </button>
           <button
             type="button"
@@ -275,26 +276,31 @@ function ChatDetail() {
       </div>
 
       <div className="chat-main-body">
-        {activeTab === 'chat' && (
-          <>
-            {loading && messages.length === 0 && <div className="hint-text">加载中…</div>}
-            {!loading && messages.length === 0 && (
-              <div className="hint-text">还没有消息，先打个招呼吧～</div>
-            )}
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={
-                    'chat-message' + (m.isMe ? ' chat-message-me' : ' chat-message-other')
-                  }
-                >
-                  <div className="chat-message-bubble">{m.content}</div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        {activeTab === 'chat' && (() => {
+          const chatMessages = messages.filter(
+            (m) => m.type !== 'question' && !(m.content || '').startsWith('付费提问：')
+          );
+          return (
+            <>
+              {loading && messages.length === 0 && <div className="hint-text">加载中…</div>}
+              {!loading && chatMessages.length === 0 && (
+                <div className="hint-text">还没有消息，先打个招呼吧～</div>
+              )}
+              <div className="chat-messages">
+                {chatMessages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={
+                      'chat-message' + (m.isMe ? ' chat-message-me' : ' chat-message-other')
+                    }
+                  >
+                    <div className="chat-message-bubble">{m.content}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          );
+        })()}
 
         {activeTab === 'questions' && (
           <div className="chat-questions-pane">
