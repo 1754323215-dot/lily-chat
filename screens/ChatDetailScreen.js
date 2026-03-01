@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,9 +13,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { API_BASE_URL, formatToken } from '../constants/config';
 import { useTheme } from '../contexts/ThemeContext';
 import QuestionMessage from '../components/QuestionMessage';
+import { handleApiError } from '../utils/errorHandler';
 
 export default function ChatDetailScreen({ route, navigation }) {
   const { theme } = useTheme();
@@ -26,6 +28,8 @@ export default function ChatDetailScreen({ route, navigation }) {
   const [sending, setSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
   const flatListRef = useRef(null);
+  const lastNotifiedMessageIdRef = useRef({});
+  const initialLoadDoneRef = useRef({});
 
   useEffect(() => {
     loadCurrentUser();
@@ -43,6 +47,24 @@ export default function ChatDetailScreen({ route, navigation }) {
     }
   }, [userId, questionId]);
 
+  // 消息轮询：每10秒自动刷新消息（静默刷新，不显示 loading 避免闪烁）
+  useEffect(() => {
+    if (!userId) return;
+
+    let isMounted = true;
+
+    const pollInterval = setInterval(() => {
+      if (isMounted && navigation) {
+        loadMessages(true);
+      }
+    }, 10000); // 10秒轮询一次
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
+  }, [userId, questionId]);
+
   const loadCurrentUser = async () => {
     try {
       const userData = await AsyncStorage.getItem('user');
@@ -55,13 +77,18 @@ export default function ChatDetailScreen({ route, navigation }) {
     }
   };
 
-  const loadMessages = async () => {
-    setLoading(true);
+  const loadMessages = async (isBackgroundRefresh = false) => {
+    // 检查组件是否已卸载
+    if (!navigation) return;
+    // 仅首次加载显示 loading，轮询刷新时不闪屏
+    if (!isBackgroundRefresh) setLoading(true);
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        Alert.alert('提示', '请先登录');
-        navigation.goBack();
+        if (navigation) {
+          Alert.alert('提示', '请先登录');
+          navigation.goBack();
+        }
         return;
       }
 
@@ -80,8 +107,10 @@ export default function ChatDetailScreen({ route, navigation }) {
       // 确保 token 格式正确（后端期望 token-{userId} 格式）
       const actualToken = formatToken(token);
       if (!actualToken) {
-        Alert.alert('提示', '请先登录');
-        navigation.goBack();
+        if (navigation) {
+          Alert.alert('提示', '请先登录');
+          navigation.goBack();
+        }
         return;
       }
       const messagesUrl = `${API_BASE_URL}/messages/user/${userId}`;
@@ -90,6 +119,14 @@ export default function ChatDetailScreen({ route, navigation }) {
           'Authorization': `Bearer ${actualToken}`,
         },
       });
+
+      // 处理 401 错误
+      if (messagesResp.status === 401) {
+        if (navigation) {
+          await handleApiError(messagesResp, navigation);
+        }
+        return;
+      }
 
       let chatMessages = [];
       let pendingQuestionFromResponse = null;
@@ -125,6 +162,12 @@ export default function ChatDetailScreen({ route, navigation }) {
             'Authorization': `Bearer ${actualToken}`,
           },
         });
+        if (questionResp.status === 401) {
+          if (navigation) {
+            await handleApiError(questionResp, navigation);
+          }
+          return;
+        }
         if (questionResp.ok) {
           const questionData = await questionResp.json();
           questionMessages = [{
@@ -142,6 +185,12 @@ export default function ChatDetailScreen({ route, navigation }) {
             'Authorization': `Bearer ${actualToken}`,
           },
         });
+        if (questionsResp.status === 401) {
+          if (navigation) {
+            await handleApiError(questionsResp, navigation);
+          }
+          return;
+        }
         if (questionsResp.ok) {
           const questionsData = await questionsResp.json();
           questionMessages = Array.isArray(questionsData.questions)
@@ -171,12 +220,48 @@ export default function ChatDetailScreen({ route, navigation }) {
         return new Date(timeA) - new Date(timeB);
       });
 
+      const lastIncoming = chatMessages.filter((m) => !m.isMe).pop();
+      if (lastIncoming && userId) {
+        const lastNotifiedId = lastNotifiedMessageIdRef.current[userId];
+        const isFirstLoad = !initialLoadDoneRef.current[userId];
+        if (isFirstLoad) {
+          initialLoadDoneRef.current[userId] = true;
+          lastNotifiedMessageIdRef.current[userId] = lastIncoming.id;
+        } else if (lastIncoming.id !== lastNotifiedId) {
+          const userData = await AsyncStorage.getItem('user');
+          const user = userData ? JSON.parse(userData) : {};
+          if (user.notificationPreference === 'notification') {
+            try {
+              await Notifications.presentNotificationAsync({
+                content: {
+                  title: `${userName || '对方'} 发来新消息`,
+                  body: (lastIncoming.content || '').slice(0, 60) + ((lastIncoming.content || '').length > 60 ? '…' : ''),
+                  data: { userId, userName, avatar },
+                },
+              });
+              lastNotifiedMessageIdRef.current[userId] = lastIncoming.id;
+            } catch (e) {
+              console.warn('本地通知失败', e);
+            }
+          }
+        }
+      }
+
       setMessages(allMessages);
     } catch (error) {
       console.error('加载消息失败:', error);
-      Alert.alert('错误', '加载消息失败');
+      // 使用统一的错误处理
+      if (navigation) {
+        await handleApiError(error, navigation);
+      }
+      // 如果错误已处理（如 401），不需要额外提示
+      if (!error.message.includes('未授权')) {
+        // handleApiError 已经显示了错误提示
+      }
     } finally {
-      setLoading(false);
+      if (navigation) {
+        setLoading(false);
+      }
     }
   };
 
@@ -209,11 +294,19 @@ export default function ChatDetailScreen({ route, navigation }) {
         }),
       });
 
+      // 处理 401 错误
+      if (response.status === 401) {
+        if (navigation) {
+          await handleApiError(response, navigation);
+        }
+        return;
+      }
+
       const data = await response.json();
       if (response.ok) {
         setInputText('');
-        // 重新加载消息
-        await loadMessages();
+        // 重新加载消息（静默刷新，避免闪屏）
+        await loadMessages(true);
         // 滚动到底部
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
@@ -223,20 +316,22 @@ export default function ChatDetailScreen({ route, navigation }) {
       }
     } catch (error) {
       console.error('发送消息失败:', error);
-      Alert.alert('错误', '发送消息失败');
+      if (navigation) {
+        await handleApiError(error, navigation);
+      }
     } finally {
       setSending(false);
     }
   };
 
-  const renderMessage = ({ item }) => {
+  const renderMessage = useCallback(({ item }) => {
     if (item.type === 'question') {
       return (
-      <QuestionMessage
-        question={item.question}
-        currentUserId={currentUserId}
-        onUpdate={loadMessages}
-      />
+        <QuestionMessage
+          question={item.question}
+          currentUserId={currentUserId}
+          onUpdate={() => loadMessages(true)}
+        />
       );
     }
 
@@ -279,7 +374,7 @@ export default function ChatDetailScreen({ route, navigation }) {
         </View>
       </View>
     );
-  };
+  }, [theme, currentUserId]);
 
   if (loading) {
     return (

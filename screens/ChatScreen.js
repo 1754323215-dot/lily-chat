@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,6 +11,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, formatToken } from '../constants/config';
 import { useTheme } from '../contexts/ThemeContext';
+import { handleApiError } from '../utils/errorHandler';
 
 export default function ChatScreen({ route, navigation }) {
   const { theme } = useTheme();
@@ -20,6 +21,34 @@ export default function ChatScreen({ route, navigation }) {
   useEffect(() => {
     fetchContacts();
   }, []);
+
+  // 使用 useFocusEffect 在页面获得焦点时刷新列表
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      if (isMounted && navigation) {
+        fetchContacts();
+      }
+      return () => {
+        isMounted = false;
+      };
+    }, [navigation])
+  );
+
+  // 定期刷新聊天列表（每30秒）
+  useEffect(() => {
+    let isMounted = true;
+    const interval = setInterval(() => {
+      if (isMounted && navigation) {
+        fetchContacts();
+      }
+    }, 30000); // 30秒刷新一次
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [navigation]);
 
   // 如果导航参数中包含直接跳转到 ChatDetail 的请求，自动跳转
   useEffect(() => {
@@ -113,42 +142,38 @@ export default function ChatScreen({ route, navigation }) {
         }));
         setChats(mapped);
       } else {
-        // 如果是 401 未授权，记录更详细的错误信息
+        // 401 错误会在 handleApiError 中处理
         if (resp.status === 401) {
-          console.error('认证失败，状态码 401');
-          console.error('错误信息:', data?.message);
-          console.error('Token 值:', token);
-          throw new Error(data?.message || '未授权，请重新登录');
+          if (navigation) {
+            await handleApiError(resp, navigation);
+          }
+          setChats([]);
+          return;
         }
         throw new Error(data?.message || '加载联系人失败');
       }
     } catch (error) {
       console.error('加载联系人失败', error);
       
-      // 如果认证失败或网络错误，使用空列表而不是模拟数据
-      // 只有在确实无法连接服务器时才使用备用数据
-      if (error.message.includes('网络') || error.message.includes('连接')) {
-        setChats([
-          {
-            id: 'mock-1',
-            userId: 'mock-1',
-            userName: '示例用户A',
-            avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sampleA',
-            lastMessage: '你好，这里是示例对话',
-            lastMessageTime: '10:30',
-            unreadCount: 0,
-          },
-        ]);
-      } else {
-        // 其他错误（如认证失败、服务器错误等）显示空列表
-        setChats([]);
+      // 使用统一的错误处理
+      let handled = false;
+      if (navigation) {
+        handled = await handleApiError(error, navigation);
+      }
+      
+      // 所有错误都显示空列表，不再使用模拟数据
+      setChats([]);
+      
+      // 如果不是 401 错误（已由 handleApiError 处理），显示错误提示
+      if (!handled && !error.message.includes('未授权')) {
+        // handleApiError 已经显示了错误提示，这里不需要额外处理
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChatPress = (item) => {
+  const handleChatPress = useCallback((item) => {
     if (navigation) {
       navigation.navigate('ChatDetail', {
         userId: item.userId,
@@ -156,9 +181,9 @@ export default function ChatScreen({ route, navigation }) {
         avatar: item.avatar,
       });
     }
-  };
+  }, [navigation]);
 
-  const renderChatItem = ({ item }) => (
+  const renderChatItem = useCallback(({ item }) => (
     <TouchableOpacity 
       style={[styles.chatItem, { borderBottomColor: theme.colors.border }]}
       onPress={() => handleChatPress(item)}
@@ -181,7 +206,7 @@ export default function ChatScreen({ route, navigation }) {
         </View>
       </View>
     </TouchableOpacity>
-  );
+  ), [theme, handleChatPress]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -191,7 +216,7 @@ export default function ChatScreen({ route, navigation }) {
       }]}>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>聊天</Text>
       </View>
-      {loading ? (
+      {loading && chats.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: theme.colors.text }]}>加载中...</Text>
         </View>

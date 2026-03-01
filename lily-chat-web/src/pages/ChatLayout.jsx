@@ -73,14 +73,24 @@ function ChatDetail() {
   const lastNotifiedMessageIdRef = useRef(null);
   const lastNotifiedQuestionIdRef = useRef(null);
   const prevMessageCountRef = useRef(0);
+  const initialLoadDoneRef = useRef(false);
+  const contactsRef = useRef(contacts);
+  const refetchContactsRef = useRef(refetchContacts);
+  const notificationPreferenceRef = useRef(notificationPreference);
+  contactsRef.current = contacts;
+  refetchContactsRef.current = refetchContacts;
+  notificationPreferenceRef.current = notificationPreference;
 
   const currentUserId = getStoredAuth().user?.id;
+  const currentUserIdRef = useRef(currentUserId);
+  currentUserIdRef.current = currentUserId;
 
   useEffect(() => {
     if (!userId) return;
+    initialLoadDoneRef.current = false;
     let cancelled = false;
-    const load = async () => {
-      setLoading(true);
+    const load = async (isBackgroundRefresh = false) => {
+      if (!isBackgroundRefresh) setLoading(true);
       setError('');
       try {
         const [data, qData] = await Promise.all([
@@ -88,7 +98,7 @@ function ChatDetail() {
           api.getConversationQuestions(userId).catch(() => null),
         ]);
         if (!cancelled) {
-          const myId = currentUserId || '';
+          const myId = currentUserIdRef.current || '';
           const newMessages = Array.isArray(data.messages)
             ? data.messages.map((m) => {
                 const sid = m.senderId?._id?.toString?.() || m.senderId?.toString?.() || '';
@@ -103,7 +113,7 @@ function ChatDetail() {
           const prevCount = prevMessageCountRef.current;
           prevMessageCountRef.current = newMessages.length;
           const useNotif =
-            notificationPreference === 'notification' &&
+            notificationPreferenceRef.current === 'notification' &&
             typeof Notification !== 'undefined' &&
             Notification.permission === 'granted' &&
             document.hidden;
@@ -111,7 +121,8 @@ function ChatDetail() {
             const last = newMessages[newMessages.length - 1];
             if (!last.isMe && last.id !== lastNotifiedMessageIdRef.current) {
               lastNotifiedMessageIdRef.current = last.id;
-              const contact = contacts.find((c) => c.id === userId);
+              const list = contactsRef.current || [];
+              const contact = list.find((c) => c.id === userId || c._id === userId);
               const contactName = contact?.username || contact?.name || '对方';
               showBrowserNotification(`${contactName} 发来新消息`, {
                 body: (last.content || '').slice(0, 80) + ((last.content || '').length > 80 ? '…' : ''),
@@ -126,7 +137,7 @@ function ChatDetail() {
           }
           const isAnswerer =
             newLatest &&
-            (newLatest.answererId?._id === currentUserId || newLatest.answererId === currentUserId);
+            (newLatest.answererId?._id === currentUserIdRef.current || newLatest.answererId === currentUserIdRef.current);
           if (
             useNotif &&
             newLatest &&
@@ -140,21 +151,24 @@ function ChatDetail() {
             });
           }
           setLatestQuestion(newLatest);
-          refetchContacts();
+          // 不在每次 load 后调 refetchContacts，避免 context 更新导致 effect 反复执行；会话列表由 UnreadContext 每 20s 轮询更新
         }
       } catch (err) {
         if (!cancelled) setError(err.message || '加载消息失败');
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          initialLoadDoneRef.current = true;
+          setLoading(false);
+        }
       }
     };
     load();
-    const timer = setInterval(load, 10000);
+    const timer = setInterval(() => load(true), 10000);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [userId, currentUserId, refetchContacts, notificationPreference, contacts]);
+  }, [userId]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -172,6 +186,7 @@ function ChatDetail() {
           createdAt: newMsg?.createdAt || new Date().toISOString(),
         },
       ]);
+      refetchContactsRef.current?.();
     } catch (err) {
       setError(err.message || '发送失败');
     }
@@ -287,7 +302,7 @@ function ChatDetail() {
             </div>
           </div>
         )}
-        {loading && <div className="hint-text">加载中…</div>}
+        {loading && messages.length === 0 && <div className="hint-text">加载中…</div>}
         {!loading && messages.length === 0 && (
           <div className="hint-text">还没有消息，先打个招呼吧～</div>
         )}
