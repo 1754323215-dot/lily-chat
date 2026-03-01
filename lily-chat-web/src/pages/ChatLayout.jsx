@@ -69,6 +69,8 @@ function ChatDetail() {
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
   const [latestQuestion, setLatestQuestion] = useState(null);
+  const [questionsList, setQuestionsList] = useState([]);
+  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'questions'
   const { refetchContacts, notificationPreference, contacts } = useUnread();
   const lastNotifiedMessageIdRef = useRef(null);
   const lastNotifiedQuestionIdRef = useRef(null);
@@ -151,6 +153,8 @@ function ChatDetail() {
             });
           }
           setLatestQuestion(newLatest);
+          const list = Array.isArray(qData?.questions) ? qData.questions : [];
+          setQuestionsList(list);
           // 不在每次 load 后调 refetchContacts，避免 context 更新导致 effect 反复执行；会话列表由 UnreadContext 每 20s 轮询更新
         }
       } catch (err) {
@@ -192,42 +196,41 @@ function ChatDetail() {
     }
   };
 
-  const handleAcceptQuestion = async () => {
-    if (!latestQuestion?._id) return;
+  const refreshQuestions = async () => {
     try {
-      await api.acceptQuestion(latestQuestion._id);
       const updated = await api.getConversationQuestions(userId);
-      if (Array.isArray(updated.questions) && updated.questions.length > 0) {
-        setLatestQuestion(updated.questions[updated.questions.length - 1]);
-      }
+      const list = Array.isArray(updated?.questions) ? updated.questions : [];
+      setQuestionsList(list);
+      if (list.length > 0) setLatestQuestion(list[list.length - 1]);
+      else setLatestQuestion(null);
+    } catch (_) {}
+  };
+
+  const handleAcceptQuestion = async (q) => {
+    if (!q?._id) return;
+    try {
+      await api.acceptQuestion(q._id);
+      await refreshQuestions();
     } catch (err) {
       setError(err.message || '接受提问失败');
     }
   };
 
-  const handleRejectQuestion = async () => {
-    if (!latestQuestion?._id) return;
+  const handleRejectQuestion = async (q) => {
+    if (!q?._id) return;
     try {
-      await api.rejectQuestion(latestQuestion._id);
-      const updated = await api.getConversationQuestions(userId);
-      if (Array.isArray(updated.questions) && updated.questions.length > 0) {
-        setLatestQuestion(updated.questions[updated.questions.length - 1]);
-      } else {
-        setLatestQuestion(null);
-      }
+      await api.rejectQuestion(q._id);
+      await refreshQuestions();
     } catch (err) {
       setError(err.message || '拒绝提问失败');
     }
   };
 
-  const handleConfirmPaid = async () => {
-    if (!latestQuestion?._id) return;
+  const handleConfirmPaid = async (q) => {
+    if (!q?._id) return;
     try {
-      await api.confirmQuestionPayment(latestQuestion._id);
-      const updated = await api.getConversationQuestions(userId);
-      if (Array.isArray(updated.questions) && updated.questions.length > 0) {
-        setLatestQuestion(updated.questions[updated.questions.length - 1]);
-      }
+      await api.confirmQuestionPayment(q._id);
+      await refreshQuestions();
     } catch (err) {
       setError(err.message || '记录订单失败');
     }
@@ -237,109 +240,125 @@ function ChatDetail() {
     return <div className="hint-text">请选择左侧联系人开始聊天</div>;
   }
 
-  const q = latestQuestion;
-  const isAsker =
-    q && (q.askerId?._id === currentUserId || q.askerId === currentUserId);
-  const isAnswerer =
-    q && (q.answererId?._id === currentUserId || q.answererId === currentUserId);
+  const isAsker = (q) => q && (q.askerId?._id === currentUserId || q.askerId === currentUserId);
+  const isAnswerer = (q) => q && (q.answererId?._id === currentUserId || q.answererId === currentUserId);
+  const statusText = (status) =>
+    status === 'pending' ? '等待对方选择'
+    : status === 'accepted' ? '对方已接受，聊天中交流'
+    : status === 'completed' ? '对方已解答'
+    : status === 'rejected' ? '对方无法回答'
+    : status || '';
 
   return (
     <div className="chat-main">
       <div className="chat-main-header">
-        <div>
-          <h2 className="chat-main-title">对话</h2>
+        <h2 className="chat-main-title">对话</h2>
+        <div className="chat-main-tabs">
+          <button
+            type="button"
+            className={'chat-tab' + (activeTab === 'chat' ? ' chat-tab-active' : '')}
+            onClick={() => setActiveTab('chat')}
+          >
+            普通对话
+          </button>
+          <button
+            type="button"
+            className={'chat-tab' + (activeTab === 'questions' ? ' chat-tab-active' : '')}
+            onClick={() => setActiveTab('questions')}
+          >
+            付费提问
+            {questionsList.length > 0 && (
+              <span className="chat-tab-badge">{questionsList.length}</span>
+            )}
+          </button>
         </div>
       </div>
 
       <div className="chat-main-body">
-        {q && (
-          <div className="question-banner">
-            <div className="question-banner-main">
-              <div className="question-banner-title">
-                悬赏提问 · ¥{q.price}
-              </div>
-              <div className="question-banner-content">{q.content}</div>
-              <div className="question-banner-status">
-                当前状态：{q.status === 'pending'
-                  ? '等待对方选择'
-                  : q.status === 'accepted'
-                  ? '对方已接受，聊天中交流'
-                  : q.status === 'completed'
-                  ? '对方已解答'
-                  : q.status === 'rejected'
-                  ? '对方无法回答'
-                  : q.status}
-              </div>
+        {activeTab === 'chat' && (
+          <>
+            {loading && messages.length === 0 && <div className="hint-text">加载中…</div>}
+            {!loading && messages.length === 0 && (
+              <div className="hint-text">还没有消息，先打个招呼吧～</div>
+            )}
+            <div className="chat-messages">
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={
+                    'chat-message' + (m.isMe ? ' chat-message-me' : ' chat-message-other')
+                  }
+                >
+                  <div className="chat-message-bubble">{m.content}</div>
+                </div>
+              ))}
             </div>
-            <div className="question-banner-actions">
-              {isAnswerer && q.status === 'pending' && (
-                <>
-                  <button
-                    className="ghost-button"
-                    onClick={handleAcceptQuestion}
-                  >
-                    我有能力回答
-                  </button>
-                  <button
-                    className="ghost-button"
-                    onClick={handleAcceptQuestion}
-                  >
-                    我愿意交流
-                  </button>
-                  <button
-                    className="ghost-button"
-                    onClick={handleRejectQuestion}
-                  >
-                    我不能回答
-                  </button>
-                </>
-              )}
-              {isAsker && q.status === 'completed' && !q.paid && (
-                <button className="primary-button" onClick={handleConfirmPaid}>
-                  对方已解答，记录这次订单
-                </button>
-              )}
-            </div>
+          </>
+        )}
+
+        {activeTab === 'questions' && (
+          <div className="chat-questions-pane">
+            {loading && questionsList.length === 0 && <div className="hint-text">加载中…</div>}
+            {!loading && questionsList.length === 0 && (
+              <div className="hint-text">暂无付费提问，可在地图页面向对方发起悬赏提问</div>
+            )}
+            {questionsList.map((q) => (
+              <div key={q._id} className="question-card">
+                <div className="question-card-main">
+                  <div className="question-card-title">悬赏提问 · ¥{q.price}</div>
+                  <div className="question-card-content">{q.content}</div>
+                  <div className="question-card-status">
+                    当前状态：{statusText(q.status)}
+                  </div>
+                </div>
+                <div className="question-card-actions">
+                  {isAnswerer(q) && q.status === 'pending' && (
+                    <>
+                      <button type="button" className="ghost-button" onClick={() => handleAcceptQuestion(q)}>
+                        我有能力回答
+                      </button>
+                      <button type="button" className="ghost-button" onClick={() => handleAcceptQuestion(q)}>
+                        我愿意交流
+                      </button>
+                      <button type="button" className="ghost-button" onClick={() => handleRejectQuestion(q)}>
+                        我不能回答
+                      </button>
+                    </>
+                  )}
+                  {isAsker(q) && q.status === 'completed' && !q.paid && (
+                    <button type="button" className="primary-button" onClick={() => handleConfirmPaid(q)}>
+                      对方已解答，记录这次订单
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
-        {loading && messages.length === 0 && <div className="hint-text">加载中…</div>}
-        {!loading && messages.length === 0 && (
-          <div className="hint-text">还没有消息，先打个招呼吧～</div>
-        )}
-        <div className="chat-messages">
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={
-                'chat-message' + (m.isMe ? ' chat-message-me' : ' chat-message-other')
-              }
-            >
-              <div className="chat-message-bubble">{m.content}</div>
-            </div>
-          ))}
-        </div>
       </div>
 
-      <div className="chat-main-input">
-        {error && <div className="field-error">{error}</div>}
-        <div className="chat-input-row">
-          <input
-            className="field-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="输入消息内容…"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-          />
-          <button className="primary-button" onClick={handleSend}>
-            发送
-          </button>
+      {activeTab === 'chat' && (
+        <div className="chat-main-input">
+          {error && <div className="field-error">{error}</div>}
+          <div className="chat-input-row">
+            <input
+              className="field-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="输入消息内容…"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+            />
+            <button type="button" className="primary-button" onClick={handleSend}>
+              发送
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
