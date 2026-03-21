@@ -42,6 +42,11 @@ const feedbackSchema = new mongoose.Schema(
       enum: ['open', 'done'],
       default: 'open',
     },
+    /** 附图 URL 路径，如 /uploads/feedback/xxx.jpg */
+    images: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true }
 );

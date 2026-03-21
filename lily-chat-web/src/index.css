@@ -162,6 +162,48 @@ button:disabled {
   margin-top: 8px;
 }
 
+.profile-feedback-file-input {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.profile-feedback-previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.profile-feedback-preview-item {
+  position: relative;
+  width: 88px;
+}
+
+.profile-feedback-preview-img {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-feedback-remove-img {
+  margin-top: 4px;
+  width: 100%;
+  padding: 4px 6px;
+  font-size: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.profile-feedback-remove-img:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 .auth-tip {
   margin-top: 12px;
   font-size: 12px;

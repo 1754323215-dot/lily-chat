@@ -282,7 +282,33 @@ export const api = {
       ),
     });
   },
-  submitFeedback({ category, content, platform, appVersion, clientInfo }) {
+  submitFeedback({ category, content, platform, appVersion, clientInfo, images }) {
+    const files = Array.isArray(images) ? images.filter(Boolean) : [];
+    if (files.length > 0) {
+      const fd = new FormData();
+      fd.append('category', category);
+      fd.append('content', content != null ? String(content) : '');
+      fd.append('platform', platform);
+      if (appVersion) fd.append('appVersion', String(appVersion));
+      if (clientInfo) fd.append('clientInfo', String(clientInfo));
+      files.forEach((file) => fd.append('images', file));
+      return fetchWithAuthRetry(`${API_BASE_URL}/feedback`, {
+        method: 'POST',
+        body: fd,
+      }).then(async (resp) => {
+        if (!resp.ok) {
+          let message = '请求失败';
+          try {
+            const data = await resp.json();
+            if (data?.message) message = data.message;
+          } catch {
+            // ignore
+          }
+          throw new Error(message);
+        }
+        return resp.json();
+      });
+    }
     return request('/feedback', {
       method: 'POST',
       body: JSON.stringify({

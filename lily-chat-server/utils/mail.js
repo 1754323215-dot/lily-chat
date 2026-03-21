@@ -63,12 +63,24 @@ async function notifyFeedbackSubmitted({ feedbackDoc, submitter }) {
 
   if (adminEmails.length > 0 && isSmtpConfigured()) {
     const subject = `[Lily Chat] 新用户反馈 ${feedbackDoc._id}`;
+    const origin = (process.env.PUBLIC_API_ORIGIN || '').replace(/\/$/, '');
+    const imgLines =
+      feedbackDoc.images && feedbackDoc.images.length
+        ? [
+            '',
+            '附图链接:',
+            ...feedbackDoc.images.map((p) =>
+              origin ? `${origin}${p}` : p
+            ),
+          ]
+        : [];
     const text = [
       `类型: ${feedbackDoc.category}`,
       `平台: ${feedbackDoc.platform}`,
       `用户: ${username}（${realName}）`,
       `用户邮箱: ${email || '未填写'}`,
       `反馈内容:\n${feedbackDoc.content}`,
+      ...imgLines,
       `---`,
       `反馈ID: ${feedbackDoc._id}`,
     ].join('\n');

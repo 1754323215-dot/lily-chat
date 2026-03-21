@@ -14,6 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { TAG_TYPES, TAG_LEVELS, createTag, validateTag } from '../models/Tag';
 import { useTheme } from '../contexts/ThemeContext';
 import { API_BASE_URL, formatToken } from '../constants/config';
@@ -27,6 +28,7 @@ export default function ProfileScreen({ navigation, onLogout }) {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackCategory, setFeedbackCategory] = useState('suggestion');
   const [feedbackContent, setFeedbackContent] = useState('');
+  const [feedbackImageUris, setFeedbackImageUris] = useState([]);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [newTagType, setNewTagType] = useState('custom');
@@ -142,10 +144,51 @@ export default function ProfileScreen({ navigation, onLogout }) {
     setProofImages(newImages);
   };
 
+  const pickFeedbackImages = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('提示', '需要相册权限才能选择图片');
+        return;
+      }
+      const remaining = 5 - feedbackImageUris.length;
+      if (remaining <= 0) {
+        Alert.alert('提示', '最多 5 张图片');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        quality: 0.85,
+      });
+      if (result.canceled) return;
+      const assets = result.assets || [];
+      setFeedbackImageUris((prev) => {
+        const next = [...prev];
+        for (const a of assets) {
+          if (next.length >= 5) break;
+          next.push({
+            uri: a.uri,
+            name: a.fileName || `feedback-${Date.now()}.jpg`,
+          });
+        }
+        return next;
+      });
+    } catch (e) {
+      console.error('选择图片失败:', e);
+      Alert.alert('提示', '选择图片失败');
+    }
+  };
+
+  const removeFeedbackImageAt = (index) => {
+    setFeedbackImageUris((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmitFeedback = async () => {
     const text = feedbackContent.trim();
-    if (!text) {
-      Alert.alert('提示', '请填写反馈内容');
+    if (!text && feedbackImageUris.length === 0) {
+      Alert.alert('提示', '请填写反馈内容或上传图片');
       return;
     }
     try {
@@ -158,21 +201,45 @@ export default function ProfileScreen({ navigation, onLogout }) {
       setFeedbackSubmitting(true);
       const platform =
         Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'android';
-      const response = await fetch(`${API_BASE_URL}/feedback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${actualToken}`,
-        },
-        body: JSON.stringify({
-          category: feedbackCategory,
-          content: text,
-          platform,
-        }),
-      });
+
+      let response;
+      if (feedbackImageUris.length > 0) {
+        const formData = new FormData();
+        formData.append('category', feedbackCategory);
+        formData.append('content', text);
+        formData.append('platform', platform);
+        feedbackImageUris.forEach((item, i) => {
+          formData.append('images', {
+            uri: item.uri,
+            name: item.name || `image-${i}.jpg`,
+            type: 'image/jpeg',
+          });
+        });
+        response = await fetch(`${API_BASE_URL}/feedback`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${actualToken}`,
+          },
+          body: formData,
+        });
+      } else {
+        response = await fetch(`${API_BASE_URL}/feedback`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${actualToken}`,
+          },
+          body: JSON.stringify({
+            category: feedbackCategory,
+            content: text,
+            platform,
+          }),
+        });
+      }
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
         setFeedbackContent('');
+        setFeedbackImageUris([]);
         setShowFeedbackModal(false);
         Alert.alert('成功', '感谢您的反馈');
       } else {
@@ -881,13 +948,41 @@ export default function ProfileScreen({ navigation, onLogout }) {
                 minHeight: 100,
                 textAlignVertical: 'top',
               }]}
-              placeholder="请描述遇到的问题或建议（最多2000字）"
+              placeholder="可只发图；若打字，最多2000字"
               placeholderTextColor={theme.colors.placeholder}
               value={feedbackContent}
               onChangeText={setFeedbackContent}
               multiline
               maxLength={2000}
             />
+
+            <Text style={[styles.label, { color: theme.colors.text }]}>附图（可选，最多5张）</Text>
+            <TouchableOpacity
+              style={[styles.imagePickerButton, {
+                backgroundColor: theme.colors.inputBackground,
+                borderColor: theme.colors.border,
+              }]}
+              onPress={pickFeedbackImages}
+            >
+              <Text style={[styles.imagePickerText, { color: theme.colors.text }]}>
+                + 选择图片 ({feedbackImageUris.length}/5)
+              </Text>
+            </TouchableOpacity>
+            {feedbackImageUris.length > 0 && (
+              <View style={styles.feedbackImageRow}>
+                {feedbackImageUris.map((item, idx) => (
+                  <View key={`${item.uri}-${idx}`} style={styles.feedbackImageWrap}>
+                    <Image source={{ uri: item.uri }} style={styles.feedbackThumb} />
+                    <TouchableOpacity
+                      style={styles.feedbackImageRemove}
+                      onPress={() => removeFeedbackImageAt(idx)}
+                    >
+                      <Text style={styles.feedbackImageRemoveText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -1103,6 +1198,47 @@ const styles = StyleSheet.create({
   },
   menuArrow: {
     fontSize: 20,
+  },
+  imagePickerButton: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  imagePickerText: {
+    fontSize: 14,
+  },
+  feedbackImageRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  feedbackImageWrap: {
+    position: 'relative',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  feedbackThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 8,
+  },
+  feedbackImageRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  feedbackImageRemoveText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   // 弹窗样式
   modalOverlay: {
