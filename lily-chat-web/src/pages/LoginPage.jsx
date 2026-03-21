@@ -26,7 +26,7 @@ export default function LoginPage() {
         setStoredAuth({
           token: data.token,
           user: data.user,
-          refreshToken: data.refreshToken || undefined,
+          refreshToken: data.refreshToken,
         });
         navigate(from, { replace: true });
       } else {

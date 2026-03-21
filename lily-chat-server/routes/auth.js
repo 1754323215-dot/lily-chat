@@ -10,7 +10,7 @@ const router = express.Router();
 
 // JWT 配置
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'; // 默认 7 天
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d'; // 默认 30 天（可用环境变量覆盖）
 const TOKEN_REFRESH_EXPIRES_IN = process.env.TOKEN_REFRESH_EXPIRES_IN || '30d'; // 刷新 token 30 天
 
 if (!JWT_SECRET || JWT_SECRET === 'lily-chat-secret-key-change-in-production') {

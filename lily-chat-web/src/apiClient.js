@@ -11,14 +11,16 @@ export function getStoredAuth() {
   };
 }
 
-export function setStoredAuth({ token, user, refreshToken }) {
+export function setStoredAuth(payload) {
+  const { token, user, refreshToken } = payload;
   if (token) {
     localStorage.setItem('token', token);
   }
   if (user) {
     localStorage.setItem('user', JSON.stringify(user));
   }
-  if (refreshToken !== undefined) {
+  // 登录时显式传入 refreshToken（含 undefined）时同步覆盖，避免换账号后仍用旧 refresh
+  if (Object.prototype.hasOwnProperty.call(payload, 'refreshToken')) {
     if (refreshToken) {
       localStorage.setItem('refreshToken', refreshToken);
     } else {
@@ -33,42 +35,69 @@ export function clearStoredAuth() {
   localStorage.removeItem('refreshToken');
 }
 
-let refreshPromise = null;
+let refreshInFlight = null;
+
+/**
+ * 调用 /auth/refresh 并写入新 access token。
+ * @param {{ clearOnUnauthorized?: boolean }} [opts] 若为 true 且服务端返回 401，则 clearStoredAuth（用于 bootstrap）
+ */
+async function performTokenRefresh(opts = {}) {
+  const { clearOnUnauthorized = false } = opts;
+  const { refreshToken } = getStoredAuth();
+  if (!refreshToken) return false;
+
+  try {
+    const resp = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data?.token) {
+      if (clearOnUnauthorized && resp.status === 401) {
+        clearStoredAuth();
+      }
+      return false;
+    }
+    const prev = getStoredAuth();
+    setStoredAuth({
+      token: data.token,
+      user: data.user || prev.user,
+      refreshToken: prev.refreshToken,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function tryRefreshAccessToken() {
   const { refreshToken } = getStoredAuth();
   if (!refreshToken) return false;
 
-  if (refreshPromise) {
-    return refreshPromise;
+  if (!refreshInFlight) {
+    refreshInFlight = performTokenRefresh().finally(() => {
+      refreshInFlight = null;
+    });
   }
+  return refreshInFlight;
+}
 
-  refreshPromise = (async () => {
-    try {
-      const resp = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data?.token) {
-        return false;
-      }
-      const prev = getStoredAuth();
-      setStoredAuth({
-        token: data.token,
-        user: data.user || prev.user,
-        refreshToken: prev.refreshToken,
-      });
-      return true;
-    } catch {
-      return false;
-    } finally {
-      refreshPromise = null;
-    }
-  })();
+/**
+ * 首屏启动时调用：若有 refreshToken，先换新 access token，避免多接口同时 401。
+ * 刷新令牌也失效（401）时清本地登录态。
+ */
+export async function bootstrapAuth() {
+  const { refreshToken } = getStoredAuth();
+  if (!refreshToken) return;
+  await performTokenRefresh({ clearOnUnauthorized: true });
+}
 
-  return refreshPromise;
+function redirectToLoginIfNeeded() {
+  if (typeof window === 'undefined') return;
+  const p = window.location.pathname || '';
+  if (p.includes('/login')) return;
+  window.location.assign('/login');
 }
 
 /** 带 Bearer 的请求：401 时尝试 refresh 后重试一次（用于 FormData 上传等） */
@@ -85,6 +114,8 @@ async function fetchWithAuthRetry(url, options = {}, isRetry = false) {
     if (ok) {
       return fetchWithAuthRetry(url, options, true);
     }
+    clearStoredAuth();
+    redirectToLoginIfNeeded();
   }
   return resp;
 }
@@ -113,6 +144,8 @@ async function request(path, options = {}, isRetryAfterRefresh = false) {
     if (ok) {
       return request(path, options, true);
     }
+    clearStoredAuth();
+    redirectToLoginIfNeeded();
   }
 
   if (!resp.ok) {
