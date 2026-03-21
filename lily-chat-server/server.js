@@ -61,6 +61,7 @@ app.use('/api/questions', require('./routes/questions'));
 app.use('/api/messages', messagesRouter);
 app.get('/api/v1/contacts', authenticate, messagesRouter.getContacts);
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/feedback', require('./routes/feedback'));
 
 // Socket.IO 连接处理
 io.on('connection', (socket) => {

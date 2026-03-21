@@ -11,11 +11,12 @@ import {
   Alert,
   Switch,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TAG_TYPES, TAG_LEVELS, createTag, validateTag } from '../models/Tag';
 import { useTheme } from '../contexts/ThemeContext';
-import { API_BASE_URL } from '../constants/config';
+import { API_BASE_URL, formatToken } from '../constants/config';
 
 export default function ProfileScreen({ navigation, onLogout }) {
   const { theme, isDark, toggleTheme } = useTheme();
@@ -23,6 +24,10 @@ export default function ProfileScreen({ navigation, onLogout }) {
   const [verificationStatus, setVerificationStatus] = useState('unverified'); // unverified, pending, verified, rejected
   const [tags, setTags] = useState([]);
   const [showAddTagModal, setShowAddTagModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState('suggestion');
+  const [feedbackContent, setFeedbackContent] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [newTagType, setNewTagType] = useState('custom');
   const [proofText, setProofText] = useState('');
@@ -32,6 +37,9 @@ export default function ProfileScreen({ navigation, onLogout }) {
     email: '',
     password: '',
     avatarUrl: '',
+    wechatQRCode: '',
+    alipayQRCode: '',
+    notificationPreference: 'inApp',
   });
 
   useEffect(() => {
@@ -48,8 +56,11 @@ export default function ProfileScreen({ navigation, onLogout }) {
         setVerificationStatus(user.verificationStatus || 'unverified');
         setProfileForm({
           email: user.email || '',
-          password: '', // 出于安全考虑不回显密码
+          password: '',
           avatarUrl: user.avatar || '',
+          wechatQRCode: user.paymentQRCode?.wechat || '',
+          alipayQRCode: user.paymentQRCode?.alipay || '',
+          notificationPreference: user.notificationPreference === 'notification' ? 'notification' : 'inApp',
         });
       }
     } catch (error) {
@@ -57,9 +68,64 @@ export default function ProfileScreen({ navigation, onLogout }) {
     }
   };
 
-  const handleSaveProfile = () => {
-    // 这里只做前端展示，实际保存需要调用后端接口
-    Alert.alert('提示', '个人资料保存逻辑尚未接入后端，可后续在服务器实现。');
+  const handleSaveProfile = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('提示', '请先登录');
+        return;
+      }
+
+      const actualToken = formatToken(token);
+      if (!actualToken) {
+        Alert.alert('提示', '请先登录');
+        return;
+      }
+
+      setUploading(true);
+
+      const response = await fetch(`${API_BASE_URL}/users/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${actualToken}`,
+        },
+        body: JSON.stringify({
+          email: profileForm.email,
+          password: profileForm.password || undefined,
+          avatar: profileForm.avatarUrl || undefined,
+          paymentQRCode: {
+            wechat: profileForm.wechatQRCode || null,
+            alipay: profileForm.alipayQRCode || null,
+          },
+          notificationPreference: profileForm.notificationPreference === 'notification' ? 'notification' : 'inApp',
+        }),
+    });
+
+      const data = await response.json();
+      if (response.ok) {
+        Alert.alert('成功', '个人资料已保存');
+        // 更新本地用户信息
+        if (currentUser) {
+          const updatedUser = {
+            ...currentUser,
+            email: data.user.email,
+            avatar: data.user.avatar,
+            paymentQRCode: data.user.paymentQRCode,
+            notificationPreference: data.user.notificationPreference || 'inApp',
+          };
+          await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+          setCurrentUser(updatedUser);
+        }
+      } else {
+        Alert.alert('错误', data.message || '保存失败');
+      }
+    } catch (error) {
+      console.error('保存资料失败:', error);
+      Alert.alert('错误', '保存资料失败');
+    } finally {
+      setUploading(false);
+    }
   };
 
   // 暂时禁用图片选择功能，避免因原生模块未正确链接导致闪退
@@ -74,6 +140,50 @@ export default function ProfileScreen({ navigation, onLogout }) {
     const newImages = [...proofImages];
     newImages.splice(index, 1);
     setProofImages(newImages);
+  };
+
+  const handleSubmitFeedback = async () => {
+    const text = feedbackContent.trim();
+    if (!text) {
+      Alert.alert('提示', '请填写反馈内容');
+      return;
+    }
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const actualToken = formatToken(token);
+      if (!actualToken) {
+        Alert.alert('提示', '请先登录');
+        return;
+      }
+      setFeedbackSubmitting(true);
+      const platform =
+        Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'android';
+      const response = await fetch(`${API_BASE_URL}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${actualToken}`,
+        },
+        body: JSON.stringify({
+          category: feedbackCategory,
+          content: text,
+          platform,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        setFeedbackContent('');
+        setShowFeedbackModal(false);
+        Alert.alert('成功', '感谢您的反馈');
+      } else {
+        Alert.alert('提示', data.message || '提交失败');
+      }
+    } catch (e) {
+      console.error('提交反馈失败:', e);
+      Alert.alert('错误', '网络异常，请稍后重试');
+    } finally {
+      setFeedbackSubmitting(false);
+    }
   };
 
   const handleAddTag = async () => {
@@ -282,6 +392,61 @@ export default function ProfileScreen({ navigation, onLogout }) {
             autoCapitalize="none"
           />
 
+          <Text style={[styles.label, { color: theme.colors.text, marginTop: 15 }]}>收款码设置</Text>
+          <Text style={[styles.hintText, { color: theme.colors.secondaryText }]}>
+            设置收款码后，其他用户付费提问时会显示您的收款码
+          </Text>
+
+          <Text style={[styles.label, { color: theme.colors.text }]}>微信收款码（图片URL）</Text>
+          <TextInput
+            style={[styles.input, { 
+              backgroundColor: theme.colors.inputBackground, 
+              borderColor: theme.colors.border,
+              color: theme.colors.text 
+            }]}
+            placeholder="请输入微信收款码图片的网络链接"
+            placeholderTextColor={theme.colors.placeholder}
+            value={profileForm.wechatQRCode}
+            onChangeText={(text) =>
+              setProfileForm((prev) => ({ ...prev, wechatQRCode: text }))
+            }
+            autoCapitalize="none"
+          />
+          {profileForm.wechatQRCode ? (
+            <View style={styles.qrCodePreview}>
+              <Image
+                source={{ uri: profileForm.wechatQRCode }}
+                style={styles.qrCodePreviewImage}
+                resizeMode="contain"
+              />
+            </View>
+          ) : null}
+
+          <Text style={[styles.label, { color: theme.colors.text }]}>支付宝收款码（图片URL）</Text>
+          <TextInput
+            style={[styles.input, { 
+              backgroundColor: theme.colors.inputBackground, 
+              borderColor: theme.colors.border,
+              color: theme.colors.text 
+            }]}
+            placeholder="请输入支付宝收款码图片的网络链接"
+            placeholderTextColor={theme.colors.placeholder}
+            value={profileForm.alipayQRCode}
+            onChangeText={(text) =>
+              setProfileForm((prev) => ({ ...prev, alipayQRCode: text }))
+            }
+            autoCapitalize="none"
+          />
+          {profileForm.alipayQRCode ? (
+            <View style={styles.qrCodePreview}>
+              <Image
+                source={{ uri: profileForm.alipayQRCode }}
+                style={styles.qrCodePreviewImage}
+                resizeMode="contain"
+              />
+            </View>
+          ) : null}
+
           <TouchableOpacity
             style={[styles.profileSaveButton, { 
               backgroundColor: theme.colors.inputBackground,
@@ -381,6 +546,41 @@ export default function ProfileScreen({ navigation, onLogout }) {
           </View>
         </View>
 
+        {/* 设置：通知方式 */}
+        <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>设置</Text>
+          <Text style={[styles.label, { color: theme.colors.text }]}>通知方式</Text>
+          <View style={styles.notificationOptions}>
+            <TouchableOpacity
+              style={[
+                styles.notificationOption,
+                { borderColor: theme.colors.border, backgroundColor: theme.colors.inputBackground },
+                profileForm.notificationPreference === 'inApp' && { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary },
+              ]}
+              onPress={() => setProfileForm((p) => ({ ...p, notificationPreference: 'inApp' }))}
+            >
+              <Text style={[styles.notificationOptionText, { color: theme.colors.text }, profileForm.notificationPreference === 'inApp' && { color: theme.colors.primary, fontWeight: '600' }]}>
+                仅页面内提示
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.notificationOption,
+                { borderColor: theme.colors.border, backgroundColor: theme.colors.inputBackground },
+                profileForm.notificationPreference === 'notification' && { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary },
+              ]}
+              onPress={() => setProfileForm((p) => ({ ...p, notificationPreference: 'notification' }))}
+            >
+              <Text style={[styles.notificationOptionText, { color: theme.colors.text }, profileForm.notificationPreference === 'notification' && { color: theme.colors.primary, fontWeight: '600' }]}>
+                通知提示（系统通知栏/弹窗）
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.hintText, { color: theme.colors.secondaryText }]}>
+            选择「通知提示」后，收到新消息或新提问时会弹出系统通知。请保存资料以生效。
+          </Text>
+        </View>
+
         {/* 其他功能区域 */}
         <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
           {/* 主题切换 */}
@@ -406,14 +606,17 @@ export default function ProfileScreen({ navigation, onLogout }) {
             <Text style={[styles.menuText, { color: theme.colors.text }]}>付费提问记录</Text>
             <Text style={[styles.menuArrow, { color: theme.colors.secondaryText }]}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: theme.colors.border }]}>
-            <Text style={styles.menuIcon}>💰</Text>
-            <Text style={[styles.menuText, { color: theme.colors.text }]}>我的收入</Text>
+          <TouchableOpacity
+            style={[styles.menuItem, { borderBottomColor: theme.colors.border }]}
+            onPress={() => setShowFeedbackModal(true)}
+          >
+            <Text style={styles.menuIcon}>💬</Text>
+            <Text style={[styles.menuText, { color: theme.colors.text }]}>意见反馈</Text>
             <Text style={[styles.menuArrow, { color: theme.colors.secondaryText }]}>›</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.menuItem, { borderBottomColor: theme.colors.border }]}>
-            <Text style={styles.menuIcon}>⚙️</Text>
-            <Text style={[styles.menuText, { color: theme.colors.text }]}>设置</Text>
+            <Text style={styles.menuIcon}>💰</Text>
+            <Text style={[styles.menuText, { color: theme.colors.text }]}>我的收入</Text>
             <Text style={[styles.menuArrow, { color: theme.colors.secondaryText }]}>›</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -600,6 +803,117 @@ export default function ProfileScreen({ navigation, onLogout }) {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showFeedbackModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !feedbackSubmitting && setShowFeedbackModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>意见反馈</Text>
+
+            <Text style={[styles.label, { color: theme.colors.text }]}>类型</Text>
+            <View style={styles.typeButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.typeButton,
+                  { borderColor: theme.colors.border, backgroundColor: theme.colors.inputBackground },
+                  feedbackCategory === 'bug' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+                ]}
+                onPress={() => setFeedbackCategory('bug')}
+              >
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    { color: theme.colors.secondaryText },
+                    feedbackCategory === 'bug' && styles.typeButtonTextActive,
+                  ]}
+                >
+                  问题
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.typeButton,
+                  { borderColor: theme.colors.border, backgroundColor: theme.colors.inputBackground },
+                  feedbackCategory === 'suggestion' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+                ]}
+                onPress={() => setFeedbackCategory('suggestion')}
+              >
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    { color: theme.colors.secondaryText },
+                    feedbackCategory === 'suggestion' && styles.typeButtonTextActive,
+                  ]}
+                >
+                  建议
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.typeButton,
+                  { borderColor: theme.colors.border, backgroundColor: theme.colors.inputBackground },
+                  feedbackCategory === 'other' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+                ]}
+                onPress={() => setFeedbackCategory('other')}
+              >
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    { color: theme.colors.secondaryText },
+                    feedbackCategory === 'other' && styles.typeButtonTextActive,
+                  ]}
+                >
+                  其他
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.label, { color: theme.colors.text }]}>内容</Text>
+            <TextInput
+              style={[styles.input, {
+                backgroundColor: theme.colors.inputBackground,
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+                minHeight: 100,
+                textAlignVertical: 'top',
+              }]}
+              placeholder="请描述遇到的问题或建议（最多2000字）"
+              placeholderTextColor={theme.colors.placeholder}
+              value={feedbackContent}
+              onChangeText={setFeedbackContent}
+              multiline
+              maxLength={2000}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton, { backgroundColor: theme.colors.inputBackground }]}
+                onPress={() => {
+                  if (!feedbackSubmitting) setShowFeedbackModal(false);
+                }}
+                disabled={feedbackSubmitting}
+              >
+                <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.submitButton, { backgroundColor: theme.colors.primary }, feedbackSubmitting && styles.submitButtonDisabled]}
+                onPress={handleSubmitFeedback}
+                disabled={feedbackSubmitting}
+              >
+                {feedbackSubmitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.submitButtonText}>提交</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -750,6 +1064,38 @@ const styles = StyleSheet.create({
   menuIcon: {
     fontSize: 20,
     marginRight: 15,
+  },
+  hintText: {
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  notificationOptions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  notificationOption: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  notificationOptionText: {
+    fontSize: 14,
+  },
+  qrCodePreview: {
+    marginTop: 10,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  qrCodePreviewImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   menuText: {
     flex: 1,

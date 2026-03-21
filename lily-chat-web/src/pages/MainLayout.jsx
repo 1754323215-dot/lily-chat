@@ -5,10 +5,26 @@ import { useUnread } from '../contexts/UnreadContext';
 
 export default function MainLayout() {
   const navigate = useNavigate();
-  const { totalUnread } = useUnread();
+  const { totalUnread, pendingQuestionNotice, setPendingQuestionNotice, pendingQuestions } = useUnread();
 
   const badgeText =
     totalUnread > 99 ? '99+' : totalUnread > 0 ? String(totalUnread) : '';
+  const latestPending = pendingQuestions && pendingQuestions.length > 0 ? pendingQuestions[0] : null;
+  const visiblePendingNotice = pendingQuestionNotice || (latestPending
+    ? {
+        userId: latestPending.fromUserId || latestPending.fromUser,
+        userName: latestPending.fromUserName || '用户',
+        price: latestPending.price,
+      }
+    : null);
+
+  const handlePendingQuestionClick = () => {
+    if (!visiblePendingNotice?.userId) return;
+    navigate(`/chats/${visiblePendingNotice.userId}?tab=questions`);
+    if (pendingQuestionNotice) {
+      setPendingQuestionNotice(null);
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -48,6 +64,14 @@ export default function MainLayout() {
             >
               个人主页
             </NavLink>
+            <NavLink
+              to="/feedback"
+              className={({ isActive }) =>
+                'app-nav-link' + (isActive ? ' active' : '')
+              }
+            >
+              意见反馈
+            </NavLink>
           </nav>
           <button
             className="ghost-button"
@@ -61,6 +85,18 @@ export default function MainLayout() {
         </div>
       </header>
       <main className="app-main">
+        {visiblePendingNotice && (
+          <div className="chat-pending-notice" role="button" tabIndex={0} onClick={handlePendingQuestionClick} onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') handlePendingQuestionClick();
+          }}>
+            <span>
+              {pendingQuestions?.length > 1
+                ? `您有 ${pendingQuestions.length} 个待处理提问`
+                : `新提问：${visiblePendingNotice.userName || '用户'} 向您提问${visiblePendingNotice.price ? `（¥${visiblePendingNotice.price}）` : ''}`}
+            </span>
+            <span className="chat-pending-notice-action">查看</span>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

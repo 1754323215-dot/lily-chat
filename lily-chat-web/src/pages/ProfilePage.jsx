@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, getStoredAuth } from '../apiClient';
+import { api, getStoredAuth, setStoredAuth, clearStoredAuth } from '../apiClient';
 import { useUnread } from '../contexts/UnreadContext';
+import FeedbackSection from '../components/FeedbackSection';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ export default function ProfilePage() {
     error: '',
   });
   const [profile, setProfile] = useState(null);
+  const [loadError, setLoadError] = useState('');
   const [form, setForm] = useState({
     email: '',
     avatarUrl: '',
@@ -20,7 +22,6 @@ export default function ProfilePage() {
     password: '',
     notificationPreference: 'inApp',
   });
-
   useEffect(() => {
     const stored = getStoredAuth();
     const userId = stored.user?.id || stored.user?._id;
@@ -40,15 +41,16 @@ export default function ProfilePage() {
           wechatQRCode: u.paymentQRCode?.wechat || '',
           alipayQRCode: u.paymentQRCode?.alipay || '',
           password: '',
-          notificationPreference: u.notificationPreference === 'notification' ? 'notification' : 'inApp',
+          notificationPreference:
+            u.notificationPreference === 'notification'
+              ? 'notification'
+              : (stored.user?.notificationPreference === 'notification' ? 'notification' : 'inApp'),
         });
+        setLoadError('');
         setStatus((s) => ({ ...s, loading: false, error: '' }));
       } catch (e) {
-        setStatus((s) => ({
-          ...s,
-          loading: false,
-          error: e.message || '加载个人资料失败',
-        }));
+        setLoadError(e.message || '加载个人资料失败');
+        setStatus((s) => ({ ...s, loading: false }));
       }
     };
     load();
@@ -56,6 +58,39 @@ export default function ProfilePage() {
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const handleUploadQRCode = (provider) => async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setStatus((s) => ({ ...s, saving: true, error: '' }));
+    try {
+      const resp = await api.uploadPaymentQRCode(provider, file);
+      const qr = resp.paymentQRCode || {};
+      setForm((prev) => ({
+        ...prev,
+        wechatQRCode: qr.wechat || prev.wechatQRCode,
+        alipayQRCode: qr.alipay || prev.alipayQRCode,
+      }));
+      // 同步到本地 profile，方便预览和后续使用
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              paymentQRCode: qr,
+            }
+          : prev
+      );
+    } catch (err) {
+      setStatus((s) => ({
+        ...s,
+        error: err.message || '上传收款码失败',
+      }));
+    } finally {
+      setStatus((s) => ({ ...s, saving: false }));
+      // 允许重复选择同一文件
+      e.target.value = '';
+    }
   };
 
   const handleSave = async () => {
@@ -69,6 +104,16 @@ export default function ProfilePage() {
         alipayQRCode: form.alipayQRCode,
         notificationPreference: form.notificationPreference,
       });
+      const stored = getStoredAuth();
+      if (stored?.user) {
+        setStoredAuth({
+          token: stored.token,
+          user: {
+            ...stored.user,
+            notificationPreference: form.notificationPreference,
+          },
+        });
+      }
       setNotificationPreference(form.notificationPreference);
       setStatus((s) => ({ ...s, saving: false }));
       setForm((prev) => ({ ...prev, password: '' }));
@@ -81,6 +126,34 @@ export default function ProfilePage() {
     }
   };
 
+  const handleNotificationPreferenceChange = async (value) => {
+    setForm((p) => ({ ...p, notificationPreference: value }));
+    setNotificationPreference(value);
+
+    const stored = getStoredAuth();
+    if (stored?.user) {
+      setStoredAuth({
+        token: stored.token,
+        user: {
+          ...stored.user,
+          notificationPreference: value,
+        },
+      });
+    }
+
+    // 仅切到系统通知时尝试申请权限
+    if (value === 'notification' && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+
+    // 选择后立即持久化，避免用户未点“保存修改”导致刷新回退
+    try {
+      await api.updateProfile({ notificationPreference: value });
+    } catch (_) {
+      // 保留本地值，失败时由用户点击“保存修改”重试
+    }
+  };
+
   if (loading) {
     return (
       <div className="profile-page">
@@ -89,18 +162,28 @@ export default function ProfilePage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="profile-page">
-        <div className="profile-card">
-          <div className="field-error">{error}</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="profile-page">
+      {loadError && (
+        <div className="profile-card profile-error-banner">
+          <div className="field-error">{loadError}</div>
+          <p className="profile-error-hint">
+            可先尝试重新登录以恢复资料编辑；您也可在下方直接提交意见反馈。
+          </p>
+          <button
+            type="button"
+            className="primary-button profile-relogin-button"
+            onClick={() => {
+              clearStoredAuth();
+              navigate('/login', { replace: true });
+            }}
+          >
+            重新登录
+          </button>
+        </div>
+      )}
+
+      {profile && (
       <div className="profile-card">
         <div className="profile-header">
           <div className="profile-avatar">
@@ -162,7 +245,7 @@ export default function ProfilePage() {
                 name="notificationPreference"
                 value="inApp"
                 checked={form.notificationPreference === 'inApp'}
-                onChange={() => setForm((p) => ({ ...p, notificationPreference: 'inApp' }))}
+                onChange={() => handleNotificationPreferenceChange('inApp')}
               />
               <span>仅页面内提示</span>
             </label>
@@ -172,12 +255,7 @@ export default function ProfilePage() {
                 name="notificationPreference"
                 value="notification"
                 checked={form.notificationPreference === 'notification'}
-                onChange={() => {
-                  setForm((p) => ({ ...p, notificationPreference: 'notification' }));
-                  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-                    Notification.requestPermission();
-                  }
-                }}
+                onChange={() => handleNotificationPreferenceChange('notification')}
               />
               <span>通知提示（浏览器/系统弹窗）</span>
             </label>
@@ -205,6 +283,20 @@ export default function ProfilePage() {
             />
           </label>
           <label className="field-label">
+            微信收款码图片上传
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleUploadQRCode('wechat')}
+            />
+          </label>
+          {form.wechatQRCode && (
+            <div className="profile-qrcode-preview">
+              <div className="field-label">微信收款码预览</div>
+              <img src={form.wechatQRCode} alt="微信收款码预览" className="profile-qrcode-image" />
+            </div>
+          )}
+          <label className="field-label">
             支付宝收款码链接
             <input
               className="field-input"
@@ -213,6 +305,20 @@ export default function ProfilePage() {
               placeholder="可选，用于别人付款给你"
             />
           </label>
+          <label className="field-label">
+            支付宝收款码图片上传
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleUploadQRCode('alipay')}
+            />
+          </label>
+          {form.alipayQRCode && (
+            <div className="profile-qrcode-preview">
+              <div className="field-label">支付宝收款码预览</div>
+              <img src={form.alipayQRCode} alt="支付宝收款码预览" className="profile-qrcode-image" />
+            </div>
+          )}
         </div>
 
         {error && <div className="field-error">{error}</div>}
@@ -224,6 +330,11 @@ export default function ProfilePage() {
         >
           {saving ? '保存中…' : '保存修改'}
         </button>
+      </div>
+      )}
+
+      <div className="profile-card">
+        <FeedbackSection />
       </div>
     </div>
   );

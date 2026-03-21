@@ -23,7 +23,11 @@ export default function LoginPage() {
     try {
       const data = await api.loginWithRealName(realName.trim(), idCard.trim());
       if (data?.token && data?.user) {
-        setStoredAuth({ token: data.token, user: data.user });
+        setStoredAuth({
+          token: data.token,
+          user: data.user,
+          refreshToken: data.refreshToken || undefined,
+        });
         navigate(from, { replace: true });
       } else {
         setError('登录返回数据异常');

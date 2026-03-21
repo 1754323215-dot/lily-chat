@@ -37,10 +37,20 @@ const questionLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// 用户反馈提交（防刷）
+const feedbackLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 分钟
+  max: 5, // 每 15 分钟最多 5 条
+  message: '反馈提交过于频繁，请稍后再试',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   apiLimiter,
   authLimiter,
   messageLimiter,
-  questionLimiter
+  questionLimiter,
+  feedbackLimiter,
 };
 

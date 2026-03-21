@@ -5,6 +5,7 @@ import MainLayout from './pages/MainLayout';
 import MapPage from './pages/MapPage';
 import ChatLayout from './pages/ChatLayout';
 import ProfilePage from './pages/ProfilePage';
+import FeedbackPage from './pages/FeedbackPage';
 import './index.css';
 
 const AuthGuard = ({ children }) => {
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="map" element={<MapPage />} />
         <Route path="chats/*" element={<ChatLayout />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="feedback" element={<FeedbackPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
