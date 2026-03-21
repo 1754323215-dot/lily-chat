@@ -1,5 +1,50 @@
+const path = require('path');
+const fs = require('fs');
 const nodemailer = require('nodemailer');
 const logger = require('./logger');
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * 将反馈附图以附件形式内嵌到邮件（cid），正文里用 <img src="cid:..."> 显示为图片
+ */
+function buildFeedbackInlineImages(imageUrls) {
+  if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
+    return { attachments: [], htmlSnippet: '' };
+  }
+  const attachments = [];
+  const htmlParts = [];
+  imageUrls.forEach((urlPath, i) => {
+    const fn = path.basename(urlPath || '');
+    if (!fn || fn === '.' || fn === '..') return;
+    const diskPath = path.join(__dirname, '..', 'uploads', 'feedback', fn);
+    if (!fs.existsSync(diskPath)) {
+      logger.warn('反馈附图文件不存在，无法内嵌邮件', { fn });
+      return;
+    }
+    const cid = `feedbackimg${i}`;
+    const ext = path.extname(diskPath) || '.png';
+    attachments.push({
+      filename: `feedback-${i}${ext}`,
+      path: diskPath,
+      cid,
+    });
+    htmlParts.push(
+      `<p style="margin:8px 0;"><img src="cid:${cid}" alt="" style="max-width:560px;height:auto;border:1px solid #ddd;border-radius:6px;display:block;" /></p>`
+    );
+  });
+  const htmlSnippet =
+    htmlParts.length > 0
+      ? `<div style="margin-top:16px;"><strong>附图：</strong>${htmlParts.join('')}</div>`
+      : '';
+  return { attachments, htmlSnippet };
+}
 
 let transporter = null;
 
@@ -28,7 +73,7 @@ function getTransporter() {
 }
 
 /**
- * @param {{ to: string, subject: string, text: string, html?: string }} opts
+ * @param {{ to: string, subject: string, text: string, html?: string, attachments?: object[] }} opts
  */
 async function sendMail(opts) {
   const t = getTransporter();
@@ -43,6 +88,7 @@ async function sendMail(opts) {
     subject: opts.subject,
     text: opts.text,
     html: opts.html,
+    attachments: opts.attachments || [],
   });
   return true;
 }
@@ -64,11 +110,14 @@ async function notifyFeedbackSubmitted({ feedbackDoc, submitter }) {
   if (adminEmails.length > 0 && isSmtpConfigured()) {
     const subject = `[Lily Chat] 新用户反馈 ${feedbackDoc._id}`;
     const origin = (process.env.PUBLIC_API_ORIGIN || '').replace(/\/$/, '');
-    const imgLines =
+    const { attachments, htmlSnippet } = buildFeedbackInlineImages(
+      feedbackDoc.images || []
+    );
+    const imgTextLines =
       feedbackDoc.images && feedbackDoc.images.length
         ? [
             '',
-            '附图链接:',
+            '附图（纯文本客户端可打开下列链接）:',
             ...feedbackDoc.images.map((p) =>
               origin ? `${origin}${p}` : p
             ),
@@ -80,14 +129,31 @@ async function notifyFeedbackSubmitted({ feedbackDoc, submitter }) {
       `用户: ${username}（${realName}）`,
       `用户邮箱: ${email || '未填写'}`,
       `反馈内容:\n${feedbackDoc.content}`,
-      ...imgLines,
+      ...imgTextLines,
+      attachments.length
+        ? '\n（支持 HTML 的邮箱中，附图已直接显示在邮件正文内。）'
+        : '',
       `---`,
       `反馈ID: ${feedbackDoc._id}`,
     ].join('\n');
+
+    const html = `
+<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;font-size:14px;color:#333;">
+<p><strong>类型：</strong>${escapeHtml(feedbackDoc.category)}</p>
+<p><strong>平台：</strong>${escapeHtml(feedbackDoc.platform)}</p>
+<p><strong>用户：</strong>${escapeHtml(username)}（${escapeHtml(realName)}）</p>
+<p><strong>用户邮箱：</strong>${escapeHtml(email || '未填写')}</p>
+<p><strong>反馈内容：</strong></p>
+<pre style="white-space:pre-wrap;background:#f5f5f5;padding:12px;border-radius:8px;">${escapeHtml(feedbackDoc.content)}</pre>
+${htmlSnippet || ''}
+<hr style="border:none;border-top:1px solid #eee;margin:16px 0;" />
+<p style="color:#888;font-size:12px;">反馈ID：${escapeHtml(String(feedbackDoc._id))}</p>
+</body></html>`;
+
     for (const to of adminEmails) {
       try {
-        await sendMail({ to, subject, text });
-        logger.info('反馈通知邮件已发送', { to });
+        await sendMail({ to, subject, text, html, attachments });
+        logger.info('反馈通知邮件已发送', { to, inlineImages: attachments.length });
       } catch (e) {
         logger.warn('反馈通知邮件发送失败', { to, message: e.message });
       }
