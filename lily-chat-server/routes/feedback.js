@@ -6,6 +6,7 @@ const { authenticate } = require('./auth');
 const { feedbackLimiter } = require('../middleware/rateLimiter');
 const { sanitize } = require('../utils/xssFilter');
 const logger = require('../utils/logger');
+const { notifyFeedbackSubmitted } = require('../utils/mail');
 
 const router = express.Router();
 
@@ -71,6 +72,15 @@ router.post(
       });
 
       logger.info('用户反馈已提交', { feedbackId: doc._id.toString(), userId: req.user._id.toString() });
+
+      notifyFeedbackSubmitted({
+        feedbackDoc: doc,
+        submitter: {
+          username: req.user.username,
+          realName: req.user.realName,
+          email: req.user.email,
+        },
+      }).catch((e) => logger.warn('反馈邮件异步任务异常', { message: e.message }));
 
       return res.status(201).json({
         message: '感谢您的反馈',
