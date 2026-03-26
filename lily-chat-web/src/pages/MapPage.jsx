@@ -6,15 +6,35 @@ import { wgs84ToGcj02 } from '../utils/wgs84ToGcj02';
 const AMAP_KEY = '944bd085212b846ede2315d3d240a199';
 const DEFAULT_CENTER = { latitude: 39.90923, longitude: 116.397428 };
 
+/** 高德 JS API 2.0：2021-12-02 后申请的 Key 需配「安全密钥」，且须在加载 maps 脚本前设置 _AMapSecurityConfig */
+function getAmapSecurityCode() {
+  if (typeof window !== 'undefined' && window.__AMAP_SECURITY_CODE__) {
+    const s = String(window.__AMAP_SECURITY_CODE__).trim();
+    if (s) return s;
+  }
+  const v = import.meta.env.VITE_AMAP_SECURITY_CODE;
+  return v ? String(v).trim() : '';
+}
+
+function applyAmapSecurityConfig() {
+  const code = getAmapSecurityCode();
+  if (!code) return;
+  window._AMapSecurityConfig = {
+    securityJsCode: code,
+  };
+}
+
 function loadAMap() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (window.AMap) {
       resolve(window.AMap);
       return;
     }
+    applyAmapSecurityConfig();
     const script = document.createElement('script');
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}`;
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.MarkerClusterer`;
     script.async = true;
+    script.onerror = () => reject(new Error('高德脚本加载失败'));
     script.onload = () => resolve(window.AMap);
     document.head.appendChild(script);
   });
@@ -153,8 +173,17 @@ export default function MapPage() {
           zoom: 15,
           center,
           viewMode: '2D',
+          resizeEnable: true,
+          mapStyle: 'amap://styles/normal',
         });
         mapInstanceRef.current = map;
+        map.on('complete', () => {
+          if (typeof map.resize === 'function') {
+            try {
+              map.resize();
+            } catch (_) {}
+          }
+        });
         if (typeof map.resize === 'function') {
           try {
             map.resize();

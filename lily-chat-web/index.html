@@ -8,6 +8,10 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- 可选：填入高德控制台「安全密钥」（与 Key 同应用）。也可在构建时使用环境变量 VITE_AMAP_SECURITY_CODE，勿提交密钥到 Git -->
+    <script>
+      window.__AMAP_SECURITY_CODE__ = '';
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

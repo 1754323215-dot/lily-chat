@@ -31,6 +31,10 @@ local.properties
 *.keystore
 !debug.keystore
 
+# lily-chat-web 本地密钥（勿提交）
+lily-chat-web/.env.production
+lily-chat-web/.env.local
+
 # node.js
 node_modules/
 npm-debug.log
