@@ -38,6 +38,7 @@ export default function MapPage() {
   const [mapReady, setMapReady] = useState(false);
   const clusterRef = useRef(null);
   const boundsDebounceRef = useRef(null);
+  const selfMarkerRef = useRef(null);
   const [questionTarget, setQuestionTarget] = useState(null);
   const [questionContent, setQuestionContent] = useState('');
   const [questionPrice, setQuestionPrice] = useState('10');
@@ -60,52 +61,12 @@ export default function MapPage() {
       west: typeof sw.lng === 'function' ? sw.lng() : sw.lng,
     };
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c0d4a3b9-3042-437e-b276-a7da0d0c971b', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '27eed3',
-      },
-      body: JSON.stringify({
-        sessionId: '27eed3',
-        runId: 'pre-fix',
-        hypothesisId: 'H1',
-        location: 'MapPage.jsx:loadUsersForCurrentBounds',
-        message: 'loadUsersForCurrentBounds called',
-        data: { bounds: payload },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
     try {
-      setLoading(true);
-      setError('');
       const data = await api.getNearbyUsers(payload);
       setUsers(Array.isArray(data?.users) ? data.users : []);
+      setError('');
     } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c0d4a3b9-3042-437e-b276-a7da0d0c971b', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Debug-Session-Id': '27eed3',
-        },
-        body: JSON.stringify({
-          sessionId: '27eed3',
-          runId: 'pre-fix',
-          hypothesisId: 'H2',
-          location: 'MapPage.jsx:loadUsersForCurrentBounds',
-          message: 'getNearbyUsers failed',
-          data: { errorMessage: e?.message || '', name: e?.name || '' },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       setError(e.message || '获取附近用户失败');
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -162,18 +123,34 @@ export default function MapPage() {
 
   useEffect(() => {
     if (!location || !mapRef.current) return;
-    const center = [location.longitude, location.latitude];
+    let cancelled = false;
 
-    const init = async () => {
+    const run = async () => {
       try {
         const amap = await loadAMap();
+        if (cancelled) return;
+
+        const lng = location.longitude;
+        const lat = location.latitude;
+        const center = [lng, lat];
+
+        const existing = mapInstanceRef.current;
+        if (existing) {
+          existing.setCenter(center);
+          if (selfMarkerRef.current) {
+            selfMarkerRef.current.setPosition(center);
+          }
+          await loadUsersForCurrentBounds();
+          return;
+        }
+
         const map = new amap.Map(mapRef.current, {
           zoom: 15,
           center,
           viewMode: '2D',
         });
         mapInstanceRef.current = map;
-        new amap.Marker({
+        selfMarkerRef.current = new amap.Marker({
           position: center,
           map,
           title: locationFromClick ? '所选位置' : '我的位置',
@@ -181,17 +158,14 @@ export default function MapPage() {
         if (locationFromClick) {
           map.on('click', (e) => {
             const lnglat = e.lnglat;
-            const lat = lnglat.getLat();
-            const lng = lnglat.getLng();
-            setLocation({ latitude: lat, longitude: lng });
+            setLocation({ latitude: lnglat.getLat(), longitude: lnglat.getLng() });
             setError('');
           });
         }
 
-        // 初次加载当前视野内的用户
         await loadUsersForCurrentBounds();
+        if (cancelled) return;
 
-        // 地图移动 / 缩放后，重新按视野加载用户（增加防抖，避免高频请求）
         const scheduleLoad = () => {
           if (boundsDebounceRef.current) {
             clearTimeout(boundsDebounceRef.current);
@@ -208,14 +182,32 @@ export default function MapPage() {
         console.error('高德地图加载失败', e);
       }
     };
-    init();
+
+    run();
     return () => {
+      cancelled = true;
+    };
+  }, [location?.latitude, location?.longitude, locationFromClick, loadUsersForCurrentBounds]);
+
+  useEffect(() => {
+    return () => {
+      if (boundsDebounceRef.current) {
+        clearTimeout(boundsDebounceRef.current);
+        boundsDebounceRef.current = null;
+      }
+      if (clusterRef.current && clusterRef.current.clearMarkers) {
+        clusterRef.current.clearMarkers();
+      }
+      clusterRef.current = null;
+      markersRef.current.forEach((m) => m.setMap(null));
+      markersRef.current = [];
       if (mapInstanceRef.current) {
         mapInstanceRef.current.destroy();
         mapInstanceRef.current = null;
       }
+      selfMarkerRef.current = null;
     };
-  }, [location?.latitude, location?.longitude, locationFromClick, loadUsersForCurrentBounds]);
+  }, []);
 
   useEffect(() => {
     if (!window.AMap || !mapReady || !mapInstanceRef.current) return;
@@ -275,6 +267,11 @@ export default function MapPage() {
                 <span className="map-user-name">{u.name}</span>
                 {u.tags && u.tags.length > 0 && (
                   <span className="map-user-tags">{u.tags.map((t) => t.name).join(' · ')}</span>
+                )}
+                {typeof u.creditScore === 'number' && typeof u.abilityScore === 'number' && (
+                  <span className="map-user-tags">
+                    信用分：{u.creditScore} · 能力分：{u.abilityScore}
+                  </span>
                 )}
               </div>
               <div className="map-user-actions">
