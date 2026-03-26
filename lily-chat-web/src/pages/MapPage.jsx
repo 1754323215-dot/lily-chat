@@ -140,6 +140,11 @@ export default function MapPage() {
           if (selfMarkerRef.current) {
             selfMarkerRef.current.setPosition(center);
           }
+          if (typeof existing.resize === 'function') {
+            try {
+              existing.resize();
+            } catch (_) {}
+          }
           await loadUsersForCurrentBounds();
           return;
         }
@@ -150,6 +155,11 @@ export default function MapPage() {
           viewMode: '2D',
         });
         mapInstanceRef.current = map;
+        if (typeof map.resize === 'function') {
+          try {
+            map.resize();
+          } catch (_) {}
+        }
         selfMarkerRef.current = new amap.Marker({
           position: center,
           map,
@@ -178,6 +188,13 @@ export default function MapPage() {
         map.on('moveend', scheduleLoad);
         map.on('zoomend', scheduleLoad);
         setMapReady(true);
+        requestAnimationFrame(() => {
+          if (typeof map.resize === 'function') {
+            try {
+              map.resize();
+            } catch (_) {}
+          }
+        });
       } catch (e) {
         console.error('高德地图加载失败', e);
       }
@@ -188,6 +205,27 @@ export default function MapPage() {
       cancelled = true;
     };
   }, [location?.latitude, location?.longitude, locationFromClick, loadUsersForCurrentBounds]);
+
+  // flex 布局下容器尺寸常晚于 new Map；需 resize 才能正确铺瓦片（否则只见底背景+标记）
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current || !mapRef.current) return;
+    const map = mapInstanceRef.current;
+    const el = mapRef.current;
+    const doResize = () => {
+      if (typeof map.resize !== 'function') return;
+      try {
+        map.resize();
+      } catch (_) {}
+    };
+    doResize();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(doResize) : null;
+    if (ro) ro.observe(el);
+    window.addEventListener('resize', doResize);
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener('resize', doResize);
+    };
+  }, [mapReady]);
 
   useEffect(() => {
     return () => {
