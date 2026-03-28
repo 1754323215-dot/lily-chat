@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
@@ -13,6 +14,28 @@ const HOST = process.env.HOST || '0.0.0.0';
 const API_BACKEND = process.env.API_BACKEND || 'http://127.0.0.1:8083';
 
 const distPath = path.join(__dirname, 'dist');
+
+/** 缓存 dist/index.html 原文；运行时若设置 AMAP_SECURITY_CODE 则注入到 window.__AMAP_SECURITY_CODE__ */
+let indexHtmlTemplate = null;
+function readIndexHtmlTemplate() {
+  if (!indexHtmlTemplate) {
+    indexHtmlTemplate = fs.readFileSync(path.join(distPath, 'index.html'), 'utf8');
+  }
+  return indexHtmlTemplate;
+}
+
+function sendIndexHtml(res) {
+  let html = readIndexHtmlTemplate();
+  const code = process.env.AMAP_SECURITY_CODE || '';
+  if (code) {
+    html = html.replace(
+      /window\.__AMAP_SECURITY_CODE__\s*=\s*['"][^'"]*['"]/,
+      `window.__AMAP_SECURITY_CODE__ = ${JSON.stringify(code)}`,
+    );
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+}
 
 // Proxy /api to backend (8083) so login and messages work (stream body, no parse)
 app.use('/api', (req, res, next) => {
@@ -39,12 +62,12 @@ app.use('/api', (req, res, next) => {
   req.pipe(proxyReq, { end: true });
 });
 
-app.use(express.static(distPath));
-
-// SPA fallback: serve index.html for any non-file GET (Express 5 compatible)
+// 必须在 express.static 之前：否则 GET / 会直接返回 dist/index.html，无法注入高德安全密钥
 app.get(/^\/(?!.*\.).*$/, (_req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+  sendIndexHtml(res);
 });
+
+app.use(express.static(distPath));
 
 const server = app.listen(PORT, HOST, () => {
   const address = server.address();
@@ -53,6 +76,9 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`本地访问:  http://localhost:${PORT}`);
   console.log(`外部访问: http://139.129.194.84:${PORT}`);
   console.log('服务器网络接口:', Object.keys(networks));
+  console.log(
+    `AMAP_SECURITY_CODE: ${process.env.AMAP_SECURITY_CODE ? '已设置(注入 index.html)' : '未设置(若 Key 需安全校验则底图可能白屏)'}`,
+  );
 });
 
 server.on('error', (err) => {
