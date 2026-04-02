@@ -30,6 +30,13 @@ function messageBelongsToQuestion(m, questionId) {
   return normalizeQuestionId(m.questionId) === normalizeQuestionId(questionId);
 }
 
+function previewQuestionLabel(content, maxLen = 22) {
+  if (!content || typeof content !== 'string') return '…';
+  const t = content.trim();
+  if (!t) return '…';
+  return t.length <= maxLen ? t : `${t.slice(0, maxLen)}…`;
+}
+
 function normalizeSystemMessage(content, isMe) {
   if (!content || typeof content !== 'string') return content || '';
   if (content === '已接受您的付费提问') {
@@ -443,6 +450,31 @@ function ChatDetail() {
             )}
           </button>
         </div>
+        {activeTab === 'questions' && questionsList.length > 0 && (
+          <div className="question-picker-row" role="tablist" aria-label="选择悬赏提问">
+            {questionsList.map((q) => {
+              const qid = q._id || q.id;
+              const selected =
+                activeQuestionId && (q._id === activeQuestionId || q.id === activeQuestionId);
+              return (
+                <button
+                  key={qid}
+                  type="button"
+                  role="tab"
+                  aria-selected={!!selected}
+                  className={'question-chip' + (selected ? ' question-chip-active' : '')}
+                  onClick={() => {
+                    setActiveQuestionId(qid);
+                    navigate(`/chats/${userId}?tab=questions&questionId=${qid}`, { replace: true });
+                  }}
+                >
+                  <span className="question-chip-price">¥{q.price}</span>
+                  <span className="question-chip-preview">{previewQuestionLabel(q.content)}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="chat-main-body">
@@ -473,55 +505,30 @@ function ChatDetail() {
             {!loading && questionsList.length === 0 && (
               <div className="hint-text">暂无付费提问</div>
             )}
-            <div className="question-cards-list">
-            {questionsList.map((q) => (
-              <div
-                key={q._id}
-                className={'question-card' + ((activeQuestionId ? (q._id === activeQuestionId || q.id === activeQuestionId) : false) ? ' question-card-active' : '')}
-                onClick={() => {
-                  const id = q._id || q.id;
-                  setActiveQuestionId(id);
-                  navigate(`/chats/${userId}?tab=questions&questionId=${id}`, { replace: true });
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    const id = q._id || q.id;
-                    setActiveQuestionId(id);
-                    navigate(`/chats/${userId}?tab=questions&questionId=${id}`, { replace: true });
-                  }
-                }}
-              >
-                <div className="question-card-main">
-                  <div className="question-card-title">悬赏提问 · ¥{q.price}</div>
-                  <div className="question-card-content">{q.content}</div>
-                  <div className="question-card-status">
-                    当前状态：{statusText(q.status)}
-                  </div>
+            {selectedQuestion && (
+              <div className="question-thread-panel">
+                <div className="question-thread-summary">
+                  <span className="question-thread-summary-price">¥{selectedQuestion.price}</span>
+                  <span className="question-thread-summary-status">{statusText(selectedQuestion.status)}</span>
+                  <span className="question-thread-summary-text">{selectedQuestion.content}</span>
                 </div>
-                <div className="question-card-actions">
-                  {isAnswerer(q) && q.status === 'pending' && (
+                <div className="question-thread-actions">
+                  {isAnswerer(selectedQuestion) && selectedQuestion.status === 'pending' && (
                     <>
-                      <button type="button" className="primary-button" onClick={(e) => { e.stopPropagation(); handleAcceptQuestion(q); }}>
+                      <button type="button" className="primary-button" onClick={() => handleAcceptQuestion(selectedQuestion)}>
                         接受
                       </button>
-                      <button type="button" className="ghost-button" onClick={(e) => { e.stopPropagation(); handleRejectQuestion(q); }}>
+                      <button type="button" className="ghost-button" onClick={() => handleRejectQuestion(selectedQuestion)}>
                         拒绝
                       </button>
                     </>
                   )}
-                  {isAsker(q) && q.status === 'completed' && !q.paid && (
-                    <button type="button" className="primary-button" onClick={(e) => { e.stopPropagation(); handleConfirmPaid(q); }}>
+                  {isAsker(selectedQuestion) && selectedQuestion.status === 'completed' && !selectedQuestion.paid && (
+                    <button type="button" className="primary-button" onClick={() => handleConfirmPaid(selectedQuestion)}>
                       对方已解答，记录这次订单
                     </button>
                   )}
                 </div>
-              </div>
-            ))}
-            </div>
-            {selectedQuestion && (
-              <div className="question-thread-panel">
                 {isAsker(selectedQuestion) && selectedQuestion.status === 'completed' && (
                   <div className="question-dialog-subtitle question-thread-panel-pay">
                     {payeeLoading && <span>收款码加载中…</span>}
