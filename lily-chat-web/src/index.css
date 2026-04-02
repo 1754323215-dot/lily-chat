@@ -678,7 +678,7 @@ button:disabled {
   border-radius: 50%;
   object-fit: cover;
   display: block;
-  pointer-events: none;
+  pointer-events: auto;
   user-select: none;
   -webkit-user-drag: none;
 }
