@@ -662,6 +662,8 @@ button:disabled {
   background: transparent;
   font: inherit;
   line-height: 0;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   border-radius: 50%;
   overflow: hidden;
@@ -669,7 +671,9 @@ button:disabled {
   z-index: 1;
   text-decoration: none;
   color: inherit;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .chat-contact-avatar img {

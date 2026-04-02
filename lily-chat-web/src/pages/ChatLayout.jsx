@@ -89,7 +89,13 @@ function ChatList({ contacts, loading, error, onSelect, activeUserId }) {
                 className="chat-contact-avatar"
                 aria-label={`查看 ${c.username || '用户'} 的资料`}
                 title="查看资料"
-                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  // 强制使用浏览器跳转，避免某些 WebView/SPA 环境下 React Router 导航无效
+                  window.location.assign(e.currentTarget.href);
+                }}
               >
                 <img src={c.avatar} alt="" draggable={false} />
               </a>
