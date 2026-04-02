@@ -339,13 +339,19 @@ button:disabled {
   gap: 4px;
 }
 
+/* 收款码需完整显示、足够像素，勿用 cover（会裁切模块无法扫码） */
 .profile-qrcode-image {
-  width: 140px;
-  height: 140px;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(320px, 92vw);
+  max-height: min(320px, 50vh);
+  min-width: 220px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  object-fit: cover;
-  background: rgba(12, 12, 24, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  object-fit: contain;
+  image-rendering: crisp-edges;
+  background: #fff;
 }
 
 .profile-notification-options {
@@ -611,6 +617,58 @@ button:disabled {
   padding: 10px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   flex-shrink: 0;
+}
+
+.chat-main-header-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.chat-main-peer-avatar {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.chat-main-peer-avatar img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.chat-contact-avatar {
+  cursor: pointer;
+}
+
+.map-user-avatar {
+  cursor: pointer;
+}
+
+.profile-view-other-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.profile-view-other-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.profile-back-button {
+  width: auto;
 }
 
 .question-picker-row {
@@ -934,12 +992,29 @@ button:disabled {
 }
 
 .question-dialog-qrcode-image {
-  width: 140px;
-  height: 140px;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(300px, 88vw);
+  max-height: min(300px, 45vh);
+  min-width: 220px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  object-fit: cover;
-  background: rgba(12, 12, 24, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  object-fit: contain;
+  image-rendering: crisp-edges;
+  background: #fff;
+}
+
+.payment-qrcode-img-link {
+  display: inline-block;
+  line-height: 0;
+  border-radius: var(--radius-sm);
+}
+
+.payment-qrcode-open-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
 }
 
 .question-dialog-legacy-hint {

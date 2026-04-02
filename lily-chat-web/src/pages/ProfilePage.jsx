@@ -244,13 +244,19 @@ export default function ProfilePage() {
               {form.wechatQRCode && (
                 <div className="profile-qrcode-preview">
                   <div className="field-label">微信收款码</div>
-                  <img src={resolveUploadUrl(form.wechatQRCode)} alt="微信收款码" className="profile-qrcode-image" />
+                  <a href={resolveUploadUrl(form.wechatQRCode)} target="_blank" rel="noopener noreferrer" className="payment-qrcode-img-link">
+                    <img src={resolveUploadUrl(form.wechatQRCode)} alt="微信收款码" className="profile-qrcode-image" />
+                  </a>
+                  <div className="payment-qrcode-open-hint">点击图片在新窗口打开原图，便于扫码</div>
                 </div>
               )}
               {form.alipayQRCode && (
                 <div className="profile-qrcode-preview">
                   <div className="field-label">支付宝收款码</div>
-                  <img src={resolveUploadUrl(form.alipayQRCode)} alt="支付宝收款码" className="profile-qrcode-image" />
+                  <a href={resolveUploadUrl(form.alipayQRCode)} target="_blank" rel="noopener noreferrer" className="payment-qrcode-img-link">
+                    <img src={resolveUploadUrl(form.alipayQRCode)} alt="支付宝收款码" className="profile-qrcode-image" />
+                  </a>
+                  <div className="payment-qrcode-open-hint">点击图片在新窗口打开原图，便于扫码</div>
                 </div>
               )}
             </div>
@@ -340,7 +346,10 @@ export default function ProfilePage() {
           {form.wechatQRCode && (
             <div className="profile-qrcode-preview">
               <div className="field-label">微信收款码预览</div>
-              <img src={resolveUploadUrl(form.wechatQRCode)} alt="微信收款码预览" className="profile-qrcode-image" />
+              <a href={resolveUploadUrl(form.wechatQRCode)} target="_blank" rel="noopener noreferrer" className="payment-qrcode-img-link">
+                <img src={resolveUploadUrl(form.wechatQRCode)} alt="微信收款码预览" className="profile-qrcode-image" />
+              </a>
+              <div className="payment-qrcode-open-hint">点击图片在新窗口打开原图，便于扫码</div>
             </div>
           )}
           <label className="field-label">
@@ -363,7 +372,10 @@ export default function ProfilePage() {
           {form.alipayQRCode && (
             <div className="profile-qrcode-preview">
               <div className="field-label">支付宝收款码预览</div>
-              <img src={resolveUploadUrl(form.alipayQRCode)} alt="支付宝收款码预览" className="profile-qrcode-image" />
+              <a href={resolveUploadUrl(form.alipayQRCode)} target="_blank" rel="noopener noreferrer" className="payment-qrcode-img-link">
+                <img src={resolveUploadUrl(form.alipayQRCode)} alt="支付宝收款码预览" className="profile-qrcode-image" />
+              </a>
+              <div className="payment-qrcode-open-hint">点击图片在新窗口打开原图，便于扫码</div>
             </div>
           )}
         </div>

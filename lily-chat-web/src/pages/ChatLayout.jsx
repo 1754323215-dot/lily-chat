@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Route, Routes, useNavigate, useLocation, useParams } from 'react-router-dom';
-import { api, getStoredAuth } from '../apiClient';
+import { api, getStoredAuth, resolveUploadUrl } from '../apiClient';
 import { useUnread } from '../contexts/UnreadContext';
 import { getChatSession, recordChatView, sortContactsByLastViewed, pickLastViewedUserId } from '../utils/chatSession';
 
@@ -442,7 +442,19 @@ function ChatDetail() {
       }
     >
       <div className="chat-main-header">
-        <h2 className="chat-main-title">对话</h2>
+        <div className="chat-main-header-top">
+          {activeContact && (
+            <button
+              type="button"
+              className="chat-main-peer-avatar"
+              onClick={() => navigate(`/profile/${userId}`)}
+              title="查看对方资料"
+            >
+              <img src={activeContact.avatar} alt="" />
+            </button>
+          )}
+          <h2 className="chat-main-title">对话</h2>
+        </div>
         <div className="chat-main-tabs">
           <button
             type="button"
@@ -552,16 +564,21 @@ function ChatDetail() {
                             {payeeQRCode.wechat && (
                               <div className="question-dialog-qrcode-block">
                                 <div className="question-dialog-qrcode-label">微信收款码</div>
-                                <img src={payeeQRCode.wechat} alt="微信收款码" className="question-dialog-qrcode-image" />
+                                <a href={resolveUploadUrl(payeeQRCode.wechat)} target="_blank" rel="noopener noreferrer" className="payment-qrcode-img-link">
+                                  <img src={resolveUploadUrl(payeeQRCode.wechat)} alt="微信收款码" className="question-dialog-qrcode-image" />
+                                </a>
                               </div>
                             )}
                             {payeeQRCode.alipay && (
                               <div className="question-dialog-qrcode-block">
                                 <div className="question-dialog-qrcode-label">支付宝收款码</div>
-                                <img src={payeeQRCode.alipay} alt="支付宝收款码" className="question-dialog-qrcode-image" />
+                                <a href={resolveUploadUrl(payeeQRCode.alipay)} target="_blank" rel="noopener noreferrer" className="payment-qrcode-img-link">
+                                  <img src={resolveUploadUrl(payeeQRCode.alipay)} alt="支付宝收款码" className="question-dialog-qrcode-image" />
+                                </a>
                               </div>
                             )}
                           </div>
+                          <div className="payment-qrcode-open-hint">点击图片在新窗口打开原图，便于扫码</div>
                         </div>
                       </div>
                     )}
