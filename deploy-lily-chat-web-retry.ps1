@@ -3,7 +3,7 @@ $ErrorActionPreference = "Continue"
 $PemPath = "G:\a3292003647.pem"
 $SshTarget = "root@139.129.194.84"
 $RemoteCmd = @'
-cd /var/www/lily-chat && git pull origin main && cd lily-chat-web && npm run build && (pm2 delete lily-chat-web 2>/dev/null || true) && pm2 start server.js --name lily-chat-web && pm2 save && echo DEPLOY_OK
+cd /var/www/lily-chat && git fetch origin main && git reset --hard origin/main && cd lily-chat-web && npm run build && (pm2 delete lily-chat-web 2>/dev/null || true) && pm2 start server.js --name lily-chat-web && pm2 save && echo DEPLOY_OK
 '@
 $MaxAttempts = 5
 $DelaySec = 10
