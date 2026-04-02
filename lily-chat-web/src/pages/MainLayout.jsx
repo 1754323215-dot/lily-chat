@@ -2,10 +2,17 @@ import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { clearStoredAuth } from '../apiClient';
 import { useUnread } from '../contexts/UnreadContext';
+import { pickLastViewedUserId } from '../utils/chatSession';
 
 export default function MainLayout() {
   const navigate = useNavigate();
-  const { totalUnread, pendingQuestionNotice, setPendingQuestionNotice, pendingQuestions } = useUnread();
+  const {
+    totalUnread,
+    pendingQuestionNotice,
+    setPendingQuestionNotice,
+    pendingQuestions,
+    contacts,
+  } = useUnread();
 
   const badgeText =
     totalUnread > 99 ? '99+' : totalUnread > 0 ? String(totalUnread) : '';
@@ -19,8 +26,11 @@ export default function MainLayout() {
     : null);
 
   const handlePendingQuestionClick = () => {
-    if (!visiblePendingNotice?.userId) return;
-    navigate(`/chats/${visiblePendingNotice.userId}?tab=questions`);
+    const last = pickLastViewedUserId(contacts || []);
+    const fallback = visiblePendingNotice?.userId;
+    const target = last || fallback;
+    if (!target) return;
+    navigate(`/chats/${target}?tab=questions`);
     if (pendingQuestionNotice) {
       setPendingQuestionNotice(null);
     }

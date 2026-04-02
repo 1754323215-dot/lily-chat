@@ -89,6 +89,11 @@ async function getContacts(req, res) {
     }
 
     const contacts = Array.from(contactMap.values());
+    contacts.sort((a, b) => {
+      const ta = a.lastTime ? new Date(a.lastTime).getTime() : 0;
+      const tb = b.lastTime ? new Date(b.lastTime).getTime() : 0;
+      return tb - ta;
+    });
     logger.info('getContacts 返回', { count: contacts.length });
 
     res.json(contacts);
@@ -183,7 +188,8 @@ router.get('/conversation/:conversationId', authenticate, async (req, res) => {
 // 发送消息
 router.post('/', authenticate, messageLimiter, [
   body('receiverId').notEmpty().withMessage('接收者ID不能为空'),
-  body('content').trim().notEmpty().withMessage('消息内容不能为空').isLength({ max: 5000 }).withMessage('消息内容不能超过5000个字符')
+  body('content').trim().notEmpty().withMessage('消息内容不能为空').isLength({ max: 5000 }).withMessage('消息内容不能超过5000个字符'),
+  body('questionId').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('questionId 格式不正确')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -191,7 +197,7 @@ router.post('/', authenticate, messageLimiter, [
       return res.status(400).json({ message: errors.array()[0].msg });
     }
 
-    const { receiverId } = req.body;
+    const { receiverId, questionId } = req.body;
     // XSS 过滤消息内容
     const content = sanitize(req.body.content.trim());
 
@@ -208,12 +214,25 @@ router.post('/', authenticate, messageLimiter, [
 
     const conversationId = generateConversationId(req.user._id, receiverId);
 
+    let linkedQuestionId = null;
+    if (questionId) {
+      const question = await Question.findById(questionId);
+      if (!question) {
+        return res.status(404).json({ message: '提问不存在' });
+      }
+      if (question.conversationId !== conversationId) {
+        return res.status(400).json({ message: '提问与当前会话不匹配' });
+      }
+      linkedQuestionId = question._id;
+    }
+
     const message = new Message({
       conversationId,
       senderId: req.user._id,
       receiverId,
       content,
-      type: 'text'
+      type: 'text',
+      questionId: linkedQuestionId
     });
 
     await message.save();
@@ -263,10 +282,19 @@ router.get('/user/:userId', authenticate, async (req, res) => {
       { read: true, readAt: new Date() }
     );
 
-    const messages = await Message.find({ conversationId })
-      .populate('senderId', 'username avatar')
-      .populate('receiverId', 'username avatar')
-      .sort({ createdAt: 1 });
+    const { since } = req.query;
+    const messageQuery = { conversationId };
+    if (since) {
+      const sinceDate = new Date(since);
+      if (!Number.isNaN(sinceDate.getTime())) {
+        messageQuery.createdAt = { $gt: sinceDate };
+      }
+    }
+
+    const messages = await Message.find(messageQuery)
+      .select('_id senderId receiverId content type questionId createdAt')
+      .sort({ createdAt: 1 })
+      .lean();
 
     // 检查是否有未完成的付费提问
     const pendingQuestion = await Question.findOne({

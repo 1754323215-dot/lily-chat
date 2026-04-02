@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Route, Routes, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { api, getStoredAuth } from '../apiClient';
 import { useUnread } from '../contexts/UnreadContext';
+import { getChatSession, recordChatView, sortContactsByLastViewed, pickLastViewedUserId } from '../utils/chatSession';
 
 function showBrowserNotification(title, options = {}) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -51,7 +52,7 @@ function normalizeSystemMessage(content, isMe) {
   return content;
 }
 
-function ChatList({ contacts, loading, error, onSelect, activeUserId }) {
+function ChatList({ contacts, loading, error, onSelect, activeUserId, onAvatarClick }) {
   return (
     <div className="chat-sidebar">
       <div className="chat-sidebar-header">
@@ -77,7 +78,14 @@ function ChatList({ contacts, loading, error, onSelect, activeUserId }) {
             }
             onClick={() => onSelect(c)}
           >
-            <div className="chat-contact-avatar">
+            <div
+              className="chat-contact-avatar"
+              role="presentation"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAvatarClick?.(c);
+              }}
+            >
               <img src={c.avatar} alt={c.username} />
             </div>
             <div className="chat-contact-main">
@@ -118,6 +126,10 @@ function ChatDetail() {
   const [payeeQRCode, setPayeeQRCode] = useState(null);
   const [payeeLoading, setPayeeLoading] = useState(false);
   const { refetchContacts, notificationPreference, contacts } = useUnread();
+  const activeContact =
+    userId && Array.isArray(contacts)
+      ? contacts.find((c) => c.id === userId || c._id === userId)
+      : null;
   const lastNotifiedMessageIdRef = useRef(null);
   const lastNotifiedQuestionIdRef = useRef(null);
   const prevMessageCountRef = useRef(0);
@@ -615,6 +627,10 @@ export default function ChatLayout() {
     navigate(`/chats/${contact.id}`);
   };
 
+  const handleContactAvatarClick = (contact) => {
+    if (contact?.id) navigate(`/profile/${contact.id}`);
+  };
+
   return (
     <div className="chat-page">
       <div className="chat-layout">
@@ -624,6 +640,7 @@ export default function ChatLayout() {
           error={contactsError}
           onSelect={handleSelectContact}
           activeUserId={activeUserId}
+          onAvatarClick={handleContactAvatarClick}
         />
         <div className="chat-main-wrapper">
           <Routes>
