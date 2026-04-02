@@ -30,8 +30,8 @@ export default function ProfilePage() {
       return;
     }
 
-    const targetId = routeUserId || meId;
-    const isOwn = !routeUserId || routeUserId === meId;
+    const targetId = routeUserId != null && routeUserId !== '' ? String(routeUserId) : String(meId ?? '');
+    const isOwn = !routeUserId || String(routeUserId) === String(meId ?? '');
 
     const load = async () => {
       setStatus((s) => ({ ...s, loading: true }));
@@ -167,7 +167,7 @@ export default function ProfilePage() {
   }
 
   const meId = getStoredAuth().user?.id || getStoredAuth().user?._id;
-  const isOwnProfile = !routeUserId || routeUserId === meId;
+  const isOwnProfile = !routeUserId || String(routeUserId) === String(meId ?? '');
 
   return (
     <div className="profile-page">

@@ -641,6 +641,9 @@ button:disabled {
   overflow: hidden;
   flex-shrink: 0;
   line-height: 0;
+  text-decoration: none;
+  color: inherit;
+  display: inline-block;
 }
 
 .chat-main-peer-avatar img {
@@ -1139,6 +1142,9 @@ button:disabled {
   line-height: 0;
   border-radius: 50%;
   overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  display: inline-block;
 }
 
 .chat-message-avatar-img {
@@ -1147,6 +1153,8 @@ button:disabled {
   border-radius: 50%;
   display: block;
   object-fit: cover;
+  pointer-events: none;
+  user-select: none;
 }
 
 .chat-message-bubble {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Route, Routes, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Link, Route, Routes, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { api, getStoredAuth, resolveUploadUrl } from '../apiClient';
 import { useUnread } from '../contexts/UnreadContext';
 import { getChatSession, recordChatView, sortContactsByLastViewed, pickLastViewedUserId } from '../utils/chatSession';
@@ -57,7 +57,6 @@ function normalizeSystemMessage(content, isMe) {
 }
 
 function ChatList({ contacts, loading, error, onSelect, activeUserId }) {
-  const navigate = useNavigate();
   return (
     <div className="chat-sidebar">
       <div className="chat-sidebar-header">
@@ -85,17 +84,14 @@ function ChatList({ contacts, loading, error, onSelect, activeUserId }) {
                 (c.unreadCount > 0 ? ' chat-contact-has-unread' : '')
               }
             >
-              <button
-                type="button"
+              <Link
+                to={profileId ? `/profile/${encodeURIComponent(profileId)}` : '/profile'}
                 className="chat-contact-avatar"
                 aria-label={`查看 ${c.username || '用户'} 的资料`}
                 title="查看资料"
-                onClick={() => {
-                  if (profileId) navigate(`/profile/${profileId}`);
-                }}
               >
                 <img src={c.avatar} alt="" draggable={false} />
-              </button>
+              </Link>
               <div
                 className="chat-contact-main"
                 role="button"
@@ -467,14 +463,13 @@ function ChatDetail() {
       <div className="chat-main-header">
         <div className="chat-main-header-top">
           {userId && (
-            <button
-              type="button"
+            <Link
+              to={`/profile/${encodeURIComponent(String(userId))}`}
               className="chat-main-peer-avatar"
-              onClick={() => navigate(`/profile/${userId}`)}
               title="查看对方资料"
             >
               <img src={peerAvatarUrl} alt="" />
-            </button>
+            </Link>
           )}
           <h2 className="chat-main-title">对话</h2>
         </div>
@@ -539,27 +534,25 @@ function ChatDetail() {
                     }
                   >
                     {!m.isMe && userId && (
-                      <button
-                        type="button"
+                      <Link
+                        to={`/profile/${encodeURIComponent(String(userId))}`}
                         className="chat-message-avatar-btn"
                         title="查看对方资料"
                         aria-label="查看对方资料"
-                        onClick={() => navigate(`/profile/${userId}`)}
                       >
                         <img src={peerAvatarUrl} alt="" className="chat-message-avatar-img" />
-                      </button>
+                      </Link>
                     )}
                     <div className="chat-message-bubble">{normalizeSystemMessage(m.content, m.isMe)}</div>
                     {m.isMe && currentUserId && (
-                      <button
-                        type="button"
+                      <Link
+                        to={`/profile/${encodeURIComponent(String(currentUserId))}`}
                         className="chat-message-avatar-btn"
                         title="查看我的主页"
                         aria-label="查看我的主页"
-                        onClick={() => navigate(`/profile/${currentUserId}`)}
                       >
                         <img src={currentUserAvatarUrl} alt="" className="chat-message-avatar-img" />
-                      </button>
+                      </Link>
                     )}
                   </div>
                 ))}
@@ -639,27 +632,25 @@ function ChatDetail() {
                         className={'chat-message' + (m.isMe ? ' chat-message-me' : ' chat-message-other')}
                       >
                         {!m.isMe && userId && (
-                          <button
-                            type="button"
+                          <Link
+                            to={`/profile/${encodeURIComponent(String(userId))}`}
                             className="chat-message-avatar-btn"
                             title="查看对方资料"
                             aria-label="查看对方资料"
-                            onClick={() => navigate(`/profile/${userId}`)}
                           >
                             <img src={peerAvatarUrl} alt="" className="chat-message-avatar-img" />
-                          </button>
+                          </Link>
                         )}
                         <div className="chat-message-bubble">{normalizeSystemMessage(m.content, m.isMe)}</div>
                         {m.isMe && currentUserId && (
-                          <button
-                            type="button"
+                          <Link
+                            to={`/profile/${encodeURIComponent(String(currentUserId))}`}
                             className="chat-message-avatar-btn"
                             title="查看我的主页"
                             aria-label="查看我的主页"
-                            onClick={() => navigate(`/profile/${currentUserId}`)}
                           >
                             <img src={currentUserAvatarUrl} alt="" className="chat-message-avatar-img" />
-                          </button>
+                          </Link>
                         )}
                       </div>
                   ))}
