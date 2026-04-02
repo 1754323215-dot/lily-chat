@@ -38,6 +38,10 @@ function previewQuestionLabel(content, maxLen = 22) {
   return t.length <= maxLen ? t : `${t.slice(0, maxLen)}…`;
 }
 
+function dicebearSvg(seed) {
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(String(seed || 'user'))}`;
+}
+
 function normalizeSystemMessage(content, isMe) {
   if (!content || typeof content !== 'string') return content || '';
   if (content === '已接受您的付费提问') {
@@ -140,8 +144,12 @@ function ChatDetail() {
   const { refetchContacts, notificationPreference, contacts } = useUnread();
   const activeContact =
     userId && Array.isArray(contacts)
-      ? contacts.find((c) => c.id === userId || c._id === userId)
+      ? contacts.find((c) => String(c.id || c._id) === String(userId))
       : null;
+  const storedUser = getStoredAuth().user;
+  const currentUserId = storedUser?.id || storedUser?._id;
+  const currentUserAvatarUrl = storedUser?.avatar || dicebearSvg(storedUser?.username || storedUser?.name || 'me');
+  const peerAvatarUrl = activeContact?.avatar || dicebearSvg(activeContact?.username || userId || 'user');
   const lastNotifiedMessageIdRef = useRef(null);
   const lastNotifiedQuestionIdRef = useRef(null);
   const prevMessageCountRef = useRef(0);
@@ -155,7 +163,6 @@ function ChatDetail() {
   notificationPreferenceRef.current = notificationPreference;
   messagesRef.current = messages;
 
-  const currentUserId = getStoredAuth().user?.id;
   const currentUserIdRef = useRef(currentUserId);
   currentUserIdRef.current = currentUserId;
 
@@ -214,7 +221,7 @@ function ChatDetail() {
                   content: m.content,
                   type: m.type || 'text',
                   questionId: m.questionId?._id || m.questionId || null,
-                  isMe: sid === myId,
+                  isMe: String(sid) === String(myId || ''),
                   createdAt: m.createdAt,
                 };
               })
@@ -455,14 +462,14 @@ function ChatDetail() {
     >
       <div className="chat-main-header">
         <div className="chat-main-header-top">
-          {activeContact && (
+          {userId && (
             <button
               type="button"
               className="chat-main-peer-avatar"
               onClick={() => navigate(`/profile/${userId}`)}
               title="查看对方资料"
             >
-              <img src={activeContact.avatar} alt="" />
+              <img src={peerAvatarUrl} alt="" />
             </button>
           )}
           <h2 className="chat-main-title">对话</h2>
@@ -527,7 +534,29 @@ function ChatDetail() {
                       'chat-message' + (m.isMe ? ' chat-message-me' : ' chat-message-other')
                     }
                   >
+                    {!m.isMe && userId && (
+                      <button
+                        type="button"
+                        className="chat-message-avatar-btn"
+                        title="查看对方资料"
+                        aria-label="查看对方资料"
+                        onClick={() => navigate(`/profile/${userId}`)}
+                      >
+                        <img src={peerAvatarUrl} alt="" className="chat-message-avatar-img" />
+                      </button>
+                    )}
                     <div className="chat-message-bubble">{normalizeSystemMessage(m.content, m.isMe)}</div>
+                    {m.isMe && currentUserId && (
+                      <button
+                        type="button"
+                        className="chat-message-avatar-btn"
+                        title="查看我的主页"
+                        aria-label="查看我的主页"
+                        onClick={() => navigate(`/profile/${currentUserId}`)}
+                      >
+                        <img src={currentUserAvatarUrl} alt="" className="chat-message-avatar-img" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -605,7 +634,29 @@ function ChatDetail() {
                         key={`q-${m.id}`}
                         className={'chat-message' + (m.isMe ? ' chat-message-me' : ' chat-message-other')}
                       >
+                        {!m.isMe && userId && (
+                          <button
+                            type="button"
+                            className="chat-message-avatar-btn"
+                            title="查看对方资料"
+                            aria-label="查看对方资料"
+                            onClick={() => navigate(`/profile/${userId}`)}
+                          >
+                            <img src={peerAvatarUrl} alt="" className="chat-message-avatar-img" />
+                          </button>
+                        )}
                         <div className="chat-message-bubble">{normalizeSystemMessage(m.content, m.isMe)}</div>
+                        {m.isMe && currentUserId && (
+                          <button
+                            type="button"
+                            className="chat-message-avatar-btn"
+                            title="查看我的主页"
+                            aria-label="查看我的主页"
+                            onClick={() => navigate(`/profile/${currentUserId}`)}
+                          >
+                            <img src={currentUserAvatarUrl} alt="" className="chat-message-avatar-img" />
+                          </button>
+                        )}
                       </div>
                   ))}
                 </div>

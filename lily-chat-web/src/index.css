@@ -1098,6 +1098,8 @@ button:disabled {
 
 .chat-message {
   display: flex;
+  align-items: flex-end;
+  gap: 8px;
 }
 
 .chat-message-me {
@@ -1106,6 +1108,27 @@ button:disabled {
 
 .chat-message-other {
   justify-content: flex-start;
+}
+
+.chat-message-avatar-btn {
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin-bottom: 2px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.chat-message-avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: block;
+  object-fit: cover;
 }
 
 .chat-message-bubble {
