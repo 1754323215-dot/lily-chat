@@ -545,9 +545,17 @@ button:disabled {
 
 .chat-contact-main {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.chat-contact-main:focus-visible {
+  box-shadow: 0 0 0 2px rgba(124, 110, 246, 0.55);
 }
 
 .chat-contact-row {

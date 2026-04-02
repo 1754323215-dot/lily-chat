@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Route, Routes, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Route, Routes, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { api, getStoredAuth, resolveUploadUrl } from '../apiClient';
 import { useUnread } from '../contexts/UnreadContext';
 import { getChatSession, recordChatView, sortContactsByLastViewed, pickLastViewedUserId } from '../utils/chatSession';
@@ -57,6 +57,7 @@ function normalizeSystemMessage(content, isMe) {
 }
 
 function ChatList({ contacts, loading, error, onSelect, activeUserId }) {
+  const navigate = useNavigate();
   return (
     <div className="chat-sidebar">
       <div className="chat-sidebar-header">
@@ -74,7 +75,7 @@ function ChatList({ contacts, loading, error, onSelect, activeUserId }) {
         )}
         {contacts.map((c) => {
           const cid = c.id || c._id;
-          const profilePath = cid != null && cid !== '' ? `/profile/${encodeURIComponent(String(cid))}` : '/profile';
+          const profileId = cid != null && cid !== '' ? String(cid) : '';
           return (
             <div
               key={cid}
@@ -83,18 +84,30 @@ function ChatList({ contacts, loading, error, onSelect, activeUserId }) {
                 (activeUserId === String(cid) ? ' chat-contact-active' : '') +
                 (c.unreadCount > 0 ? ' chat-contact-has-unread' : '')
               }
-              onClick={() => onSelect(c)}
             >
-              <Link
-                to={profilePath}
+              <button
+                type="button"
                 className="chat-contact-avatar"
                 aria-label={`查看 ${c.username || '用户'} 的资料`}
                 title="查看资料"
-                onClick={(e) => e.stopPropagation()}
+                onClick={() => {
+                  if (profileId) navigate(`/profile/${profileId}`);
+                }}
               >
                 <img src={c.avatar} alt="" draggable={false} />
-              </Link>
-              <div className="chat-contact-main">
+              </button>
+              <div
+                className="chat-contact-main"
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelect(c)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelect(c);
+                  }
+                }}
+              >
                 <div className="chat-contact-row">
                   <span className="chat-contact-name">{c.username}</span>
                   {c.lastTime && (
