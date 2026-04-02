@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Route, Routes, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Route, Routes, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { api, getStoredAuth, resolveUploadUrl } from '../apiClient';
 import { useUnread } from '../contexts/UnreadContext';
 import { getChatSession, recordChatView, sortContactsByLastViewed, pickLastViewedUserId } from '../utils/chatSession';
@@ -84,14 +84,15 @@ function ChatList({ contacts, loading, error, onSelect, activeUserId }) {
                 (c.unreadCount > 0 ? ' chat-contact-has-unread' : '')
               }
             >
-              <Link
-                to={profileId ? `/profile/${encodeURIComponent(profileId)}` : '/profile'}
+              <a
+                href={profileId ? `/profile/${encodeURIComponent(profileId)}` : '/profile'}
                 className="chat-contact-avatar"
                 aria-label={`查看 ${c.username || '用户'} 的资料`}
                 title="查看资料"
+                onClick={(e) => e.stopPropagation()}
               >
                 <img src={c.avatar} alt="" draggable={false} />
-              </Link>
+              </a>
               <div
                 className="chat-contact-main"
                 role="button"
