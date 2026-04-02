@@ -62,6 +62,30 @@ app.use('/api', (req, res, next) => {
   req.pipe(proxyReq, { end: true });
 });
 
+// 后端在 8083 上托管 /uploads（收款码等静态文件）；前端站点需把 /uploads 转到后端，否则 <img src="/uploads/..."> 会 404
+app.use('/uploads', (req, res) => {
+  const url = new URL(req.originalUrl || req.url, `http://${req.headers.host || 'localhost'}`);
+  const backend = new URL(API_BACKEND);
+  const opts = {
+    hostname: backend.hostname,
+    port: backend.port || (backend.protocol === 'https:' ? 443 : 80),
+    path: url.pathname + (url.search || ''),
+    method: req.method,
+    headers: { ...req.headers, host: backend.host },
+  };
+  delete opts.headers['host'];
+  opts.headers['Host'] = backend.host;
+  const proxyReq = http.request(opts, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+  proxyReq.on('error', (err) => {
+    console.error('Uploads proxy error:', err.message);
+    res.status(502).json({ message: '后端服务暂时不可用' });
+  });
+  req.pipe(proxyReq, { end: true });
+});
+
 // 必须在 express.static 之前：否则 GET / 会直接返回 dist/index.html，无法注入高德安全密钥
 app.get(/^\/(?!.*\.).*$/, (_req, res) => {
   sendIndexHtml(res);
