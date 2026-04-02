@@ -462,6 +462,7 @@ button:disabled {
 
 .chat-layout {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   max-width: 1200px;
@@ -581,12 +582,13 @@ button:disabled {
 
 .chat-main-wrapper {
   flex: 1;
+  min-height: 0;
   display: flex;
-  min-height: 260px;
 }
 
 .chat-main {
   flex: 1;
+  min-height: 0;
   background: rgba(12, 12, 19, 0.96);
   border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -683,7 +685,16 @@ button:disabled {
   padding: 8px;
   background: rgba(45, 212, 191, 0.04);
   border: 1px solid rgba(45, 212, 191, 0.12);
-  min-height: 120px;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-pane-normal .chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .chat-pane-paid {
@@ -691,13 +702,43 @@ button:disabled {
   padding: 8px;
   background: rgba(245, 158, 11, 0.05);
   border: 1px solid rgba(245, 158, 11, 0.15);
-  min-height: 120px;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .chat-questions-pane {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.question-cards-list {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(220px, 38vh);
+  overflow-y: auto;
+}
+
+.question-thread-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  background: rgba(28, 22, 12, 0.35);
+  padding: 8px 10px;
+  overflow: hidden;
+}
+
+.question-thread-panel-pay {
+  flex-shrink: 0;
 }
 
 .question-card {
@@ -763,6 +804,9 @@ button:disabled {
 }
 
 .chat-messages-paid-thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px dashed rgba(245, 158, 11, 0.25);
@@ -826,7 +870,10 @@ button:disabled {
 
 .chat-main-body {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   padding: 10px 10px 4px;
 }
 

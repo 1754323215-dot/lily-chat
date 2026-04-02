@@ -349,7 +349,6 @@ function ChatDetail() {
     : status === 'completed' ? '对方已解答'
     : status === 'rejected' ? '对方无法回答'
     : status || '';
-  const hasAcceptedQuestion = questionsList.some((q) => q.status === 'accepted');
   const selectedQuestion =
     (activeQuestionId && questionsList.find((q) => q._id === activeQuestionId || q.id === activeQuestionId)) ||
     questionsList.find((q) => q.status === 'accepted') ||
@@ -425,11 +424,6 @@ function ChatDetail() {
     >
       <div className="chat-main-header">
         <h2 className="chat-main-title">对话</h2>
-        <p className="chat-main-mode-desc">
-          {activeTab === 'chat'
-            ? '普通私信 · 不含悬赏/付费提问相关消息'
-            : '付费提问 · 仅显示当前选中悬赏的对话与状态'}
-        </p>
         <div className="chat-main-tabs">
           <button
             type="button"
@@ -437,7 +431,6 @@ function ChatDetail() {
             onClick={switchToChatTab}
           >
             普通聊天
-            {activeTab === 'chat' && <span className="chat-tab-tag chat-tab-tag-normal">私信</span>}
           </button>
           <button
             type="button"
@@ -448,9 +441,6 @@ function ChatDetail() {
             {questionsList.length > 0 && (
               <span className="chat-tab-badge">{questionsList.length}</span>
             )}
-            {activeTab === 'questions' && (
-              <span className="chat-tab-tag chat-tab-tag-paid">悬赏</span>
-            )}
           </button>
         </div>
       </div>
@@ -460,15 +450,7 @@ function ChatDetail() {
           const chatMessages = messages.filter(isNormalChatMessage);
           return (
             <div className="chat-pane chat-pane-normal">
-              {hasAcceptedQuestion && (
-                <div className="chat-mode-hint">
-                  当前有进行中的悬赏提问，交流与付款请在右侧「付费提问」标签内进行。
-                </div>
-              )}
               {loading && messages.length === 0 && <div className="hint-text">加载中…</div>}
-              {!loading && chatMessages.length === 0 && (
-                <div className="hint-text">还没有普通私信，先打个招呼吧～</div>
-              )}
               <div className="chat-messages">
                 {chatMessages.map((m) => (
                   <div
@@ -489,8 +471,9 @@ function ChatDetail() {
           <div className="chat-questions-pane chat-pane chat-pane-paid">
             {loading && questionsList.length === 0 && <div className="hint-text">加载中…</div>}
             {!loading && questionsList.length === 0 && (
-              <div className="hint-text">暂无付费提问，可在地图页面向对方发起悬赏提问</div>
+              <div className="hint-text">暂无付费提问</div>
             )}
+            <div className="question-cards-list">
             {questionsList.map((q) => (
               <div
                 key={q._id}
@@ -520,14 +503,11 @@ function ChatDetail() {
                 <div className="question-card-actions">
                   {isAnswerer(q) && q.status === 'pending' && (
                     <>
-                      <button type="button" className="ghost-button" onClick={(e) => { e.stopPropagation(); handleAcceptQuestion(q); }}>
-                        我有能力回答
-                      </button>
-                      <button type="button" className="ghost-button" onClick={(e) => { e.stopPropagation(); handleAcceptQuestion(q); }}>
-                        我愿意交流
+                      <button type="button" className="primary-button" onClick={(e) => { e.stopPropagation(); handleAcceptQuestion(q); }}>
+                        接受
                       </button>
                       <button type="button" className="ghost-button" onClick={(e) => { e.stopPropagation(); handleRejectQuestion(q); }}>
-                        我不能回答
+                        拒绝
                       </button>
                     </>
                   )}
@@ -539,24 +519,16 @@ function ChatDetail() {
                 </div>
               </div>
             ))}
-            {!selectedQuestion && (
-              <div className="hint-text">请先选择一个悬赏提问窗口</div>
-            )}
+            </div>
             {selectedQuestion && (
-              <div className="question-dialog-window question-dialog-window-isolated">
-                <div className="question-dialog-title-inline">
-                  悬赏对话（与上方普通聊天完全独立）· ¥{selectedQuestion.price}
-                </div>
-                <div className="question-dialog-subtitle">
-                  问题：{selectedQuestion.content}
-                </div>
+              <div className="question-thread-panel">
                 {isAsker(selectedQuestion) && selectedQuestion.status === 'completed' && (
-                  <div className="question-dialog-subtitle">
+                  <div className="question-dialog-subtitle question-thread-panel-pay">
                     {payeeLoading && <span>收款码加载中…</span>}
                     {!payeeLoading && payeeQRCode && (
                       <div className="question-dialog-qrcodes">
                         <div className="question-dialog-qrcode-item">
-                          <div className="question-dialog-qrcode-title">请使用下方收款码向对方付款，然后点击「记录这次订单」</div>
+                          <div className="question-dialog-qrcode-title">付款后点「记录这次订单」</div>
                           <div className="question-dialog-qrcode-images">
                             {payeeQRCode.wechat && (
                               <div className="question-dialog-qrcode-block">
@@ -575,18 +547,11 @@ function ChatDetail() {
                       </div>
                     )}
                     {!payeeLoading && !payeeQRCode && (
-                      <div className="question-dialog-legacy-hint">
-                        对方尚未在个人主页填写收款码，请先与对方确认支付方式。
-                      </div>
+                      <div className="question-dialog-subtitle">对方未设置收款码</div>
                     )}
                   </div>
                 )}
-                {selectedQuestionMessages.length === 0 && (
-                  <div className="question-dialog-legacy-hint">
-                    暂无绑定到此悬赏的消息。请在本标签内发送；状态更新（已接受/已拒绝等）也会只出现在这里。
-                  </div>
-                )}
-                <div className="chat-messages chat-messages-paid-thread">
+                <div className="chat-messages chat-messages-paid-thread" aria-label="悬赏对话">
                   {selectedQuestionMessages.map((m) => (
                       <div
                         key={`q-${m.id}`}
@@ -602,7 +567,7 @@ function ChatDetail() {
         )}
       </div>
 
-      {(activeTab === 'chat' ? !hasAcceptedQuestion : activeTab === 'questions') && (
+      {(activeTab === 'chat' || activeTab === 'questions') && (
         <div className="chat-main-input">
           {error && <div className="field-error">{error}</div>}
           <div className="chat-input-row">
