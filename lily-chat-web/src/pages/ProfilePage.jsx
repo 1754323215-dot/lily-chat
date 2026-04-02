@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api, getStoredAuth, setStoredAuth, clearStoredAuth } from '../apiClient';
+import { useNavigate, useParams } from 'react-router-dom';
+import { api, getStoredAuth, setStoredAuth, clearStoredAuth, resolveUploadUrl } from '../apiClient';
 import { useUnread } from '../contexts/UnreadContext';
-import FeedbackSection from '../components/FeedbackSection';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+  const { userId: routeUserId } = useParams();
   const { setNotificationPreference } = useUnread();
   const [{ loading, saving, error }, setStatus] = useState({
     loading: true,
@@ -24,15 +24,19 @@ export default function ProfilePage() {
   });
   useEffect(() => {
     const stored = getStoredAuth();
-    const userId = stored.user?.id || stored.user?._id;
-    if (!stored.token || !userId) {
+    const meId = stored.user?.id || stored.user?._id;
+    if (!stored.token || !meId) {
       navigate('/login', { replace: true });
       return;
     }
 
+    const targetId = routeUserId || meId;
+    const isOwn = !routeUserId || routeUserId === meId;
+
     const load = async () => {
+      setStatus((s) => ({ ...s, loading: true }));
       try {
-        const data = await api.getUser(userId);
+        const data = await api.getUser(targetId);
         const u = data.user || data;
         setProfile(u);
         setForm({
@@ -54,7 +58,7 @@ export default function ProfilePage() {
       }
     };
     load();
-  }, [navigate]);
+  }, [navigate, routeUserId]);
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -162,14 +166,15 @@ export default function ProfilePage() {
     );
   }
 
+  const meId = getStoredAuth().user?.id || getStoredAuth().user?._id;
+  const isOwnProfile = !routeUserId || routeUserId === meId;
+
   return (
     <div className="profile-page">
       {loadError && (
         <div className="profile-card profile-error-banner">
           <div className="field-error">{loadError}</div>
-          <p className="profile-error-hint">
-            可先尝试重新登录以恢复资料编辑；您也可在下方直接提交意见反馈。
-          </p>
+          <p className="profile-error-hint">可先尝试重新登录以恢复资料编辑。</p>
           <button
             type="button"
             className="primary-button profile-relogin-button"
@@ -185,12 +190,27 @@ export default function ProfilePage() {
 
       {profile && (
       <div className="profile-card">
+        {!isOwnProfile && (
+          <div className="profile-view-other-bar">
+            <button type="button" className="ghost-button profile-back-button" onClick={() => navigate(-1)}>
+              返回
+            </button>
+            <span className="profile-view-other-hint">查看对方资料</span>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => navigate(`/chats/${routeUserId}`)}
+            >
+              发消息
+            </button>
+          </div>
+        )}
         <div className="profile-header">
           <div className="profile-avatar">
             {form.avatarUrl ? (
-              <img src={form.avatarUrl} alt={profile.username} />
+              <img src={form.avatarUrl} alt={profile.name || profile.username || ''} />
             ) : (
-              <span>{profile.username?.[0] || 'U'}</span>
+              <span>{(profile.name || profile.username)?.[0] || 'U'}</span>
             )}
           </div>
           <div className="profile-main-info">
@@ -198,6 +218,11 @@ export default function ProfilePage() {
               <span className="profile-username">{profile.name || profile.username}</span>
               {profile.realName && (
                 <span className="profile-realname">（{profile.realName}）</span>
+              )}
+              {typeof profile.creditScore === 'number' && typeof profile.abilityScore === 'number' && (
+                <span style={{ marginTop: 6, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  能力分：{profile.abilityScore} · 信用分：{profile.creditScore}
+                </span>
               )}
             </div>
             {profile.tags && profile.tags.length > 0 && (
@@ -212,6 +237,28 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {!isOwnProfile && (form.wechatQRCode || form.alipayQRCode) && (
+          <>
+            <div className="profile-section-title">收款码（向对方付款时可扫码）</div>
+            <div className="profile-form">
+              {form.wechatQRCode && (
+                <div className="profile-qrcode-preview">
+                  <div className="field-label">微信收款码</div>
+                  <img src={resolveUploadUrl(form.wechatQRCode)} alt="微信收款码" className="profile-qrcode-image" />
+                </div>
+              )}
+              {form.alipayQRCode && (
+                <div className="profile-qrcode-preview">
+                  <div className="field-label">支付宝收款码</div>
+                  <img src={resolveUploadUrl(form.alipayQRCode)} alt="支付宝收款码" className="profile-qrcode-image" />
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {isOwnProfile && (
+        <>
         <div className="profile-section-title">账户信息</div>
         <div className="profile-form">
           <label className="field-label">
@@ -293,7 +340,7 @@ export default function ProfilePage() {
           {form.wechatQRCode && (
             <div className="profile-qrcode-preview">
               <div className="field-label">微信收款码预览</div>
-              <img src={form.wechatQRCode} alt="微信收款码预览" className="profile-qrcode-image" />
+              <img src={resolveUploadUrl(form.wechatQRCode)} alt="微信收款码预览" className="profile-qrcode-image" />
             </div>
           )}
           <label className="field-label">
@@ -316,7 +363,7 @@ export default function ProfilePage() {
           {form.alipayQRCode && (
             <div className="profile-qrcode-preview">
               <div className="field-label">支付宝收款码预览</div>
-              <img src={form.alipayQRCode} alt="支付宝收款码预览" className="profile-qrcode-image" />
+              <img src={resolveUploadUrl(form.alipayQRCode)} alt="支付宝收款码预览" className="profile-qrcode-image" />
             </div>
           )}
         </div>
@@ -330,12 +377,10 @@ export default function ProfilePage() {
         >
           {saving ? '保存中…' : '保存修改'}
         </button>
+        </>
+        )}
       </div>
       )}
-
-      <div className="profile-card">
-        <FeedbackSection />
-      </div>
     </div>
   );
 }
