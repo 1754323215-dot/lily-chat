@@ -1,5 +1,30 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
+/**
+ * 将后端返回的上传文件路径（如 /uploads/payment-qrcodes/xxx.png）转为浏览器可用的图片地址。
+ * - 已是 http(s) 或 data: 则原样返回。
+ * - 若 VITE_API_BASE_URL 为完整 URL（如 https://api.xxx.com/api），则拼到 API 同源下。
+ * - 若为相对 /api，则返回以 / 开头的路径（依赖站点对 /uploads 的反向代理，见 lily-chat-web/server.js）。
+ */
+export function resolveUploadUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+  const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  const base = import.meta.env.VITE_API_BASE_URL || '/api';
+  if (base.startsWith('http://') || base.startsWith('https://')) {
+    try {
+      const u = new URL(base.endsWith('/') ? base : `${base}/`);
+      return `${u.origin}${path}`;
+    } catch {
+      return path;
+    }
+  }
+  return path;
+}
+
 export function getStoredAuth() {
   const token = localStorage.getItem('token');
   const userJson = localStorage.getItem('user');
