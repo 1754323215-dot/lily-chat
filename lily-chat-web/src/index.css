@@ -543,12 +543,6 @@ button:disabled {
   font-weight: 600;
 }
 
-.chat-contact-avatar img {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-}
-
 .chat-contact-main {
   flex: 1;
   display: flex;
@@ -660,6 +654,22 @@ button:disabled {
   flex-shrink: 0;
   border-radius: 50%;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.chat-contact-avatar img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .map-user-avatar {

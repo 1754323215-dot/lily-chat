@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Route, Routes, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Link, Route, Routes, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { api, getStoredAuth, resolveUploadUrl } from '../apiClient';
 import { useUnread } from '../contexts/UnreadContext';
 import { getChatSession, recordChatView, sortContactsByLastViewed, pickLastViewedUserId } from '../utils/chatSession';
@@ -56,7 +56,7 @@ function normalizeSystemMessage(content, isMe) {
   return content;
 }
 
-function ChatList({ contacts, loading, error, onSelect, activeUserId, onAvatarClick }) {
+function ChatList({ contacts, loading, error, onSelect, activeUserId }) {
   return (
     <div className="chat-sidebar">
       <div className="chat-sidebar-header">
@@ -74,6 +74,7 @@ function ChatList({ contacts, loading, error, onSelect, activeUserId, onAvatarCl
         )}
         {contacts.map((c) => {
           const cid = c.id || c._id;
+          const profilePath = cid != null && cid !== '' ? `/profile/${encodeURIComponent(String(cid))}` : '/profile';
           return (
             <div
               key={cid}
@@ -82,27 +83,17 @@ function ChatList({ contacts, loading, error, onSelect, activeUserId, onAvatarCl
                 (activeUserId === String(cid) ? ' chat-contact-active' : '') +
                 (c.unreadCount > 0 ? ' chat-contact-has-unread' : '')
               }
-              role="button"
-              tabIndex={0}
               onClick={() => onSelect(c)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onSelect(c);
-                }
-              }}
             >
-              <button
-                type="button"
+              <Link
+                to={profilePath}
                 className="chat-contact-avatar"
                 aria-label={`查看 ${c.username || '用户'} 的资料`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAvatarClick?.(c);
-                }}
+                title="查看资料"
+                onClick={(e) => e.stopPropagation()}
               >
-                <img src={c.avatar} alt="" />
-              </button>
+                <img src={c.avatar} alt="" draggable={false} />
+              </Link>
               <div className="chat-contact-main">
                 <div className="chat-contact-row">
                   <span className="chat-contact-name">{c.username}</span>
@@ -708,11 +699,6 @@ export default function ChatLayout() {
     if (id) navigate(`/chats/${id}`);
   };
 
-  const handleContactAvatarClick = (contact) => {
-    const id = contact?.id || contact?._id;
-    if (id) navigate(`/profile/${id}`);
-  };
-
   return (
     <div className="chat-page">
       <div className="chat-layout">
@@ -722,7 +708,6 @@ export default function ChatLayout() {
           error={contactsError}
           onSelect={handleSelectContact}
           activeUserId={activeUserId}
-          onAvatarClick={handleContactAvatarClick}
         />
         <div className="chat-main-wrapper">
           <Routes>
