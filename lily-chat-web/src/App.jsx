@@ -23,8 +23,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* 无 path 的布局路由：避免 path="/" 父级在部分环境下无法匹配 /profile/...，落到 path="*" 被重定向回 /chats */}
       <Route
-        path="/"
         element={
           <AuthGuard>
             <MainLayout />
@@ -34,6 +34,7 @@ export default function App() {
         <Route index element={<Navigate to="/chats" replace />} />
         <Route path="map" element={<MapPage />} />
         <Route path="chats/*" element={<ChatLayout />} />
+        <Route path="profile/:userId" element={<ProfilePage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="feedback" element={<FeedbackPage />} />
       </Route>
