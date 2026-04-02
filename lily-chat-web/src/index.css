@@ -521,6 +521,10 @@ button:disabled {
   margin-bottom: 4px;
   background: transparent;
   color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  box-sizing: border-box;
 }
 
 .chat-contact:hover {
@@ -647,10 +651,28 @@ button:disabled {
 
 .chat-contact-avatar {
   cursor: pointer;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  font: inherit;
+  line-height: 0;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
 }
 
 .map-user-avatar {
   cursor: pointer;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  font: inherit;
+  line-height: 0;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
 }
 
 .profile-view-other-bar {
@@ -1327,8 +1349,13 @@ button:disabled {
 }
 
 .map-user-action {
+  font: inherit;
   font-size: 12px;
   color: var(--primary);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .map-user-actions {

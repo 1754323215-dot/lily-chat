@@ -68,44 +68,56 @@ function ChatList({ contacts, loading, error, onSelect, activeUserId, onAvatarCl
         {!loading && !error && contacts.length === 0 && (
           <div className="hint-text">暂时没有会话</div>
         )}
-        {contacts.map((c) => (
-          <button
-            key={c.id}
-            className={
-              'chat-contact' +
-              (activeUserId === c.id ? ' chat-contact-active' : '') +
-              (c.unreadCount > 0 ? ' chat-contact-has-unread' : '')
-            }
-            onClick={() => onSelect(c)}
-          >
+        {contacts.map((c) => {
+          const cid = c.id || c._id;
+          return (
             <div
-              className="chat-contact-avatar"
-              role="presentation"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAvatarClick?.(c);
+              key={cid}
+              className={
+                'chat-contact' +
+                (activeUserId === String(cid) ? ' chat-contact-active' : '') +
+                (c.unreadCount > 0 ? ' chat-contact-has-unread' : '')
+              }
+              role="button"
+              tabIndex={0}
+              onClick={() => onSelect(c)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelect(c);
+                }
               }}
             >
-              <img src={c.avatar} alt={c.username} />
-            </div>
-            <div className="chat-contact-main">
-              <div className="chat-contact-row">
-                <span className="chat-contact-name">{c.username}</span>
-                {c.lastTime && (
-                  <span className="chat-contact-time">
-                    {new Date(c.lastTime).toLocaleString()}
-                  </span>
-                )}
+              <button
+                type="button"
+                className="chat-contact-avatar"
+                aria-label={`查看 ${c.username || '用户'} 的资料`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAvatarClick?.(c);
+                }}
+              >
+                <img src={c.avatar} alt="" />
+              </button>
+              <div className="chat-contact-main">
+                <div className="chat-contact-row">
+                  <span className="chat-contact-name">{c.username}</span>
+                  {c.lastTime && (
+                    <span className="chat-contact-time">
+                      {new Date(c.lastTime).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                <div className="chat-contact-row">
+                  <span className="chat-contact-last">{c.lastMessage || '暂无消息'}</span>
+                  {c.unreadCount > 0 && (
+                    <span className="chat-contact-unread">{c.unreadCount}</span>
+                  )}
+                </div>
               </div>
-              <div className="chat-contact-row">
-                <span className="chat-contact-last">{c.lastMessage || '暂无消息'}</span>
-                {c.unreadCount > 0 && (
-                  <span className="chat-contact-unread">{c.unreadCount}</span>
-                )}
-              </div>
             </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -641,11 +653,13 @@ export default function ChatLayout() {
   }, [contacts]);
 
   const handleSelectContact = (contact) => {
-    navigate(`/chats/${contact.id}`);
+    const id = contact?.id || contact?._id;
+    if (id) navigate(`/chats/${id}`);
   };
 
   const handleContactAvatarClick = (contact) => {
-    if (contact?.id) navigate(`/profile/${contact.id}`);
+    const id = contact?.id || contact?._id;
+    if (id) navigate(`/profile/${id}`);
   };
 
   return (

@@ -322,14 +322,30 @@ export default function MapPage() {
         <div className="map-user-list">
           {users.length === 0 && !loading && <div className="hint-text">附近暂无用户</div>}
           {users.map((u) => (
-            <button
+            <div
               key={u.id}
               className="map-user-card"
+              role="button"
+              tabIndex={0}
               onClick={() => navigate(`/chats/${u.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(`/chats/${u.id}`);
+                }
+              }}
             >
-              <div className="map-user-avatar">
-                <img src={u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`} alt={u.name} />
-              </div>
+              <button
+                type="button"
+                className="map-user-avatar"
+                aria-label={`查看 ${u.name} 的资料`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/profile/${u.id}`);
+                }}
+              >
+                <img src={u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`} alt="" />
+              </button>
               <div className="map-user-info">
                 <span className="map-user-name">{u.name}</span>
                 {u.tags && u.tags.length > 0 && (
@@ -342,7 +358,8 @@ export default function MapPage() {
                 )}
               </div>
               <div className="map-user-actions">
-                <span
+                <button
+                  type="button"
                   className="map-user-action"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -350,8 +367,9 @@ export default function MapPage() {
                   }}
                 >
                   发消息
-                </span>
-                <span
+                </button>
+                <button
+                  type="button"
                   className="map-user-action"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -361,9 +379,9 @@ export default function MapPage() {
                   }}
                 >
                   悬赏提问
-                </span>
+                </button>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       </div>
