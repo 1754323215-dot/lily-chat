@@ -195,6 +195,12 @@ export const api = {
       body: JSON.stringify({ realName, idCard }),
     });
   },
+  registerWithRealName(username, realName, idCard) {
+    return request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, realName, idCard }),
+    });
+  },
   uploadPaymentQRCode(type, file) {
     const formData = new FormData();
     formData.append('type', type);
