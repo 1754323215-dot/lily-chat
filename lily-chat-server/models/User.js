@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { normalizeIdCard } = require('../utils/idCardValidator');
 
 const userSchema = new mongoose.Schema({
   username: {
@@ -70,6 +71,10 @@ const userSchema = new mongoose.Schema({
     totalSpent: { type: Number, default: 0 }
   },
   // 通知方式：inApp 仅页面内提示，notification 系统/浏览器通知
+  // 能力分 / 信用分的“原始积分”（不封顶；展示用 sqrt 映射）
+  // 初期信用/能力主要由 Question 状态机事件累积
+  abilityPoints: { type: Number, default: 0 },
+  creditPoints: { type: Number, default: 0 },
   notificationPreference: {
     type: String,
     enum: ['inApp', 'notification'],
@@ -109,19 +114,22 @@ userSchema.virtual('idCardDecrypted').get(function() {
 
 // 静态方法：通过加密的身份证号查找用户（用于登录）
 userSchema.statics.findByEncryptedIdCard = async function(realName, idCard) {
-  // 先尝试用明文查找（兼容旧数据）
-  let user = await this.findOne({ realName, idCard });
-  
-  if (!user) {
-    // 如果没找到，尝试加密后查找
-    const encryptedIdCard = encrypt(idCard);
-    user = await this.findOne({ 
-      realName, 
-      idCardEncrypted: encryptedIdCard 
-    });
+  const trimmed = (idCard || '').trim();
+  const norm = normalizeIdCard(trimmed);
+  const candidates = [...new Set([norm, trimmed].filter(Boolean))];
+
+  for (const ic of candidates) {
+    let user = await this.findOne({ realName, idCard: ic });
+    if (user) return user;
+    try {
+      const encryptedIdCard = encrypt(ic);
+      user = await this.findOne({ realName, idCardEncrypted: encryptedIdCard });
+      if (user) return user;
+    } catch (_) {
+      // ignore encrypt errors for bad legacy data
+    }
   }
-  
-  return user;
+  return null;
 };
 
 module.exports = mongoose.model('User', userSchema);

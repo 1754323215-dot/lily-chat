@@ -55,6 +55,7 @@ connectDB();
 const { authenticate } = require('./routes/auth');
 const messagesRouter = require('./routes/messages');
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api', require('./routes/verifyIdcard'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/tags', require('./routes/tags'));
 app.use('/api/questions', require('./routes/questions'));

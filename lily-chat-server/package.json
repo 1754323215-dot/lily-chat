@@ -25,6 +25,7 @@
     "node-cron": "^3.0.2",
     "nodemailer": "^6.10.1",
     "socket.io": "^4.7.2",
+    "tencentcloud-sdk-nodejs": "^4.1.206",
     "winston": "^3.19.0"
   },
   "devDependencies": {

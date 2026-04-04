@@ -6,6 +6,7 @@ const User = require('../models/User');
 const { authLimiter } = require('../middleware/rateLimiter');
 const { sanitize } = require('../utils/xssFilter');
 const logger = require('../utils/logger');
+const { verifyRealNameIdCard } = require('../utils/realNameVerify');
 const router = express.Router();
 
 // JWT 配置
@@ -125,7 +126,13 @@ router.post('/register', authLimiter, [
     // XSS 过滤
     const username = sanitize(req.body.username.trim());
     const realName = sanitize(req.body.realName.trim());
-    const idCard = req.body.idCard.trim(); // 身份证号不需要 HTML 过滤，但需要验证格式
+    const idCard = req.body.idCard.trim();
+
+    const vr = await verifyRealNameIdCard(realName, idCard);
+    if (!vr.ok) {
+      return res.status(400).json({ message: vr.message });
+    }
+    const idNorm = vr.idNorm;
 
     // 检查用户名是否已存在
     const existingUsername = await User.findOne({ username });
@@ -135,7 +142,7 @@ router.post('/register', authLimiter, [
     }
 
     // 检查身份证号是否已存在（使用加密查找）
-    const existingIdCard = await User.findByEncryptedIdCard(realName, idCard);
+    const existingIdCard = await User.findByEncryptedIdCard(realName, idNorm);
     if (existingIdCard) {
       logger.warn('注册失败: 身份证号已注册');
       return res.status(400).json({ message: '该身份证号已注册' });
@@ -145,7 +152,7 @@ router.post('/register', authLimiter, [
     const user = new User({
       username,
       realName,
-      idCard
+      idCard: idNorm,
     });
 
     await user.save();
@@ -190,8 +197,13 @@ router.post('/login', authLimiter, [
     const realName = sanitize(req.body.realName.trim());
     const idCard = req.body.idCard.trim();
 
+    const vr = await verifyRealNameIdCard(realName, idCard);
+    if (!vr.ok) {
+      return res.status(401).json({ message: vr.message || '真实姓名或身份证号错误' });
+    }
+
     // 使用加密方式查找用户
-    const user = await User.findByEncryptedIdCard(realName, idCard);
+    const user = await User.findByEncryptedIdCard(realName, vr.idNorm);
     if (!user) {
       logger.warn('登录失败: 用户名或身份证号错误', realName);
       return res.status(401).json({ message: '真实姓名或身份证号错误' });
