@@ -71,17 +71,17 @@ async function verifyNameIdCardWithTencent(name, idCard) {
 async function verifyRealNameIdCard(realName, idCardRaw) {
   const name = (realName || '').trim();
   if (!name) {
-    logger.warn('H6 verifyRealNameIdCard: empty real name');
+    logger.error('H6 verifyRealNameIdCard: empty real name');
     return { ok: false, message: '真实姓名不能为空' };
   }
 
   const idNorm = normalizeIdCard(idCardRaw);
   if (!idNorm) {
-    logger.warn('H6 verifyRealNameIdCard: empty idCard');
+    logger.error('H6 verifyRealNameIdCard: empty idCard');
     return { ok: false, message: '身份证号不能为空' };
   }
   if (!isValidChineseIdCard(idNorm)) {
-    logger.warn('H6 verifyRealNameIdCard: invalid idCard format/checksum');
+    logger.error('H6 verifyRealNameIdCard: invalid idCard format/checksum');
     return { ok: false, message: '身份证号格式或校验位不正确' };
   }
 
@@ -106,11 +106,11 @@ async function verifyRealNameIdCard(realName, idCardRaw) {
   }
 
   if (!tencent.ok) {
-    logger.warn('H6 verifyRealNameIdCard: tencent verify rejected', { message: tencent.message || '' });
+    logger.error('H6 verifyRealNameIdCard: tencent verify rejected', { message: tencent.message || '' });
     return { ok: false, message: tencent.message };
   }
 
-  logger.info('H6 verifyRealNameIdCard: passed');
+  logger.error('H6 verifyRealNameIdCard: passed');
   return { ok: true, idNorm };
 }
 

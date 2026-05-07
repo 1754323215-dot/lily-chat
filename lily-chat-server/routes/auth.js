@@ -199,7 +199,7 @@ router.post('/login', authLimiter, [
 
     const vr = await verifyRealNameIdCard(realName, idCard);
     if (!vr.ok) {
-      logger.warn('H6 /auth/login verify failed', { message: vr.message || '' });
+      logger.error('H6 /auth/login verify failed', { message: vr.message || '' });
       return res.status(401).json({ message: vr.message || '真实姓名或身份证号错误' });
     }
 
