@@ -36,6 +36,9 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7581/ingest/c87ce979-585c-4f3d-b544-9059937f150e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99d6d7'},body:JSON.stringify({sessionId:'99d6d7',runId:'pre-fix',hypothesisId:'H1',location:'LoginPage.jsx:handleSubmit',message:'auth submit start',data:{mode,usernameLength:username.trim().length,realNameLength:realName.trim().length,idCardLength:idCard.trim().length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       const data =
         mode === 'login'
           ? await api.loginWithRealName(realName.trim(), idCard.trim())
@@ -51,6 +54,9 @@ export default function LoginPage() {
         setError(mode === 'login' ? '登录返回数据异常' : '注册返回数据异常');
       }
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7581/ingest/c87ce979-585c-4f3d-b544-9059937f150e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99d6d7'},body:JSON.stringify({sessionId:'99d6d7',runId:'pre-fix',hypothesisId:'H2',location:'LoginPage.jsx:handleSubmit',message:'auth submit failed',data:{mode,errorMessage:err?.message||''},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setError(err.message || (mode === 'login' ? '登录失败' : '注册失败'));
     } finally {
       setLoading(false);

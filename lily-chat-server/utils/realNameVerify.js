@@ -54,6 +54,9 @@ async function verifyNameIdCardWithTencent(name, idCard) {
     logger.warn('腾讯云二要素未通过', { code, desc: desc.slice(0, 80) });
     return { ok: false, message: msg };
   } catch (err) {
+    // #region agent log
+    fetch('http://127.0.0.1:7581/ingest/c87ce979-585c-4f3d-b544-9059937f150e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99d6d7'},body:JSON.stringify({sessionId:'99d6d7',runId:'pre-fix',hypothesisId:'H5',location:'realNameVerify.js:verifyNameIdCardWithTencent',message:'tencent verify exception',data:{errorName:err?.name||'',errorMessage:err?.message||'',errorCode:err?.code||''},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     logger.error('腾讯云二要素调用异常', { message: err.message });
     return {
       ok: false,
@@ -83,9 +86,15 @@ async function verifyRealNameIdCard(realName, idCardRaw) {
     logger.warn('VERIFY_IDCARD_BYPASS=1，已跳过腾讯云二要素（禁止用于生产）');
     return { ok: true, idNorm };
   }
+  // #region agent log
+  fetch('http://127.0.0.1:7581/ingest/c87ce979-585c-4f3d-b544-9059937f150e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99d6d7'},body:JSON.stringify({sessionId:'99d6d7',runId:'pre-fix',hypothesisId:'H4',location:'realNameVerify.js:verifyRealNameIdCard',message:'verify config snapshot',data:{hasTencentSecretId:!!process.env.TENCENT_SECRET_ID,hasTencentSecretKey:!!process.env.TENCENT_SECRET_KEY,bypass:process.env.VERIFY_IDCARD_BYPASS==='1',region:process.env.TENCENT_FACEID_REGION||'ap-shanghai'},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   const tencent = await verifyNameIdCardWithTencent(name, idNorm);
   if (tencent === null) {
+    // #region agent log
+    fetch('http://127.0.0.1:7581/ingest/c87ce979-585c-4f3d-b544-9059937f150e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99d6d7'},body:JSON.stringify({sessionId:'99d6d7',runId:'pre-fix',hypothesisId:'H4',location:'realNameVerify.js:verifyRealNameIdCard',message:'verify unavailable because Tencent secrets missing',data:{hasTencentSecretId:!!process.env.TENCENT_SECRET_ID,hasTencentSecretKey:!!process.env.TENCENT_SECRET_KEY},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     logger.error('未配置 TENCENT_SECRET_ID/TENCENT_SECRET_KEY，无法进行联网身份核验');
     return {
       ok: false,

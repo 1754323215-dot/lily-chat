@@ -181,6 +181,9 @@ async function request(path, options = {}, isRetryAfterRefresh = false) {
     } catch {
       // ignore
     }
+    // #region agent log
+    fetch('http://127.0.0.1:7581/ingest/c87ce979-585c-4f3d-b544-9059937f150e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99d6d7'},body:JSON.stringify({sessionId:'99d6d7',runId:'pre-fix',hypothesisId:'H3',location:'apiClient.js:request',message:'api request failed',data:{path,status:resp.status,errorMessage:message,hasToken:!!token},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     throw new Error(message);
   }
 
